@@ -32,21 +32,20 @@ import (
 // to the HTTP response cache setting and refetches them upon cache expiring.
 // It is safe to use a Certificates from multiple concurrent goroutines.
 type Certificates struct {
+	URL string // Certificates URL.
+
 	certs map[string]*x509.Certificate
 	mu    sync.RWMutex // Lock for updating the map
-	t     *time.Timer  // Timer that triggers the next certificates update.
-	url   string       // Certificates URL.
-	err   error        // Last error for updating the certificates.
+	exp   time.Time    // Certificates expiration tiem.
 }
 
-// LoadCerts downloads the certificates from the given URL.
-func LoadCerts(url string, transport http.RoundTripper) (*Certificates, error) {
-	c := Certificates{url: url}
-	c.update(transport)
-	if c.err != nil {
-		return nil, c.err
+// LoadIfNecessary downloads the certificates if there are no cached ones or the
+// cache expired.
+func (c *Certificates) LoadIfNecessary(transport http.RoundTripper) error {
+	if c.exp.Before(time.Now()) {
+		return c.update(transport)
 	}
-	return &c, nil
+	return nil
 }
 
 // Cert returns the public certificate for the given key ID.
@@ -54,34 +53,23 @@ func (c *Certificates) Cert(keyID string) (*x509.Certificate, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	cert, found := c.certs[keyID]
-	if found {
-		return cert, nil
-	} else if c.err == nil {
-		return nil, fmt.Errorf("certificate not found for: %s", c.err)
-	} else {
-		return nil, c.err
+	if !found {
+		return nil, fmt.Errorf("certificate not found for keyID: %s", keyID)
 	}
+	return cert, nil
 }
 
-const retryInterval = 30 * time.Second
-
-// update fetches the certificates and starts a time for the next update.
-func (c *Certificates) update(transport http.RoundTripper) {
-	certs, cacheTime, err := downloadCerts(c.url, transport)
+// update fetches and caches the certificates.
+func (c *Certificates) update(transport http.RoundTripper) error {
+	certs, cacheTime, err := downloadCerts(c.URL, transport)
+	if err != nil {
+		return err
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.err = err
-	// In case of failure, save the error and retry the certificates fetching
-	// after retryInterval.
-	if err != nil {
-		cacheTime = retryInterval
-	} else {
-		c.certs = certs
-	}
-	if c.t != nil {
-		c.t.Stop()
-	}
-	c.t = time.AfterFunc(cacheTime, func() { c.update(transport) })
+	c.certs = certs
+	c.exp = time.Now().Add(cacheTime)
+	return nil
 }
 
 // downloadCerts downloads and parses the certificates from the given URL.

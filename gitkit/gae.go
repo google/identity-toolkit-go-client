@@ -1,0 +1,68 @@
+// Copyright 2014 Google Inc. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// +build appengine
+
+package gitkit
+
+import (
+	"net/http"
+	"sync"
+
+	"appengine"
+	"appengine/urlfetch"
+
+	"code.google.com/p/goauth2/oauth"
+)
+
+func runInGAEProd() bool {
+	return !appengine.IsDevAppServer()
+}
+
+var (
+	gaeAppToken   *oauth.Token
+	gaeAppTokenMu sync.Mutex
+)
+
+// GAEAppAuthenticator uses Google App Engine App Identity API to authenticate.
+type GAEAppAuthenticator struct {
+	ctx appengine.Context
+}
+
+// AccessToken implements Authenticator interface
+func (a GAEAppAuthenticator) AccessToken(http.RoundTripper) (string, error) {
+	gaeAppTokenMu.Lock()
+	defer gaeAppTokenMu.Unlock()
+
+	if gaeAppToken == nil || gaeAppToken.Expired() {
+		token, expiry, err := appengine.AccessToken(a.ctx, identitytoolkitScope)
+		if err != nil {
+			return "", err
+		}
+		gaeAppToken = &oauth.Token{
+			AccessToken: token,
+			Expiry:      expiry,
+		}
+	}
+	return gaeAppToken.AccessToken, nil
+}
+
+func WithContext(ctx appengine.Context, client *Client) *Client {
+	newClient := *client
+	if newClient.authenticator == nil {
+		newClient.authenticator = GAEAppAuthenticator{ctx}
+	}
+	newClient.transport = urlfetch.Client(ctx).Transport
+	return &newClient
+}

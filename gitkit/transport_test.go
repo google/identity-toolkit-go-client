@@ -44,9 +44,11 @@ func (r roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return resp, nil
 }
 
-func TestRoundTrip(t *testing.T) {
+func TestServiceAccountTransport(t *testing.T) {
 	st := &ServiceAccountTransport{
-		Token:     &oauth.Token{AccessToken: "access_token", Expiry: time.Now().Add(1 * time.Hour)},
+		Auth: &PEMKeyAuthenticator{
+			token: &oauth.Token{AccessToken: "access_token", Expiry: time.Now().Add(1 * time.Hour)},
+		},
 		Transport: roundTripper{},
 	}
 	req, err := http.NewRequest("POST", "http://localhost", nil)
@@ -67,6 +69,45 @@ func TestRoundTrip(t *testing.T) {
 		{"Authorization", "", "Bearer access_token"},
 		{"User-Agent", "", "gitkit-go-client/0.1"},
 		{"Content-type", "", "application/json"},
+	}
+	newReq := resp.Request
+	for i, ht := range headerTests {
+		if h := req.Header.Get(ht.key); h != ht.origValue {
+			t.Errorf("%d. req.Header.Get(%q) = %q; want %q", i, ht.key, h, ht.origValue)
+		}
+
+		if h := newReq.Header.Get(ht.key); h != ht.newValue {
+			t.Errorf("%d. newReq.Header.Get(%q) = %q; want %q", i, ht.key, h, ht.newValue)
+		}
+	}
+}
+
+func TestAPIKeyTransport(t *testing.T) {
+	at := &APIKeyTransport{
+		APIKey:    "API_KEY",
+		Transport: roundTripper{},
+	}
+	req, err := http.NewRequest("GET", "http://localhost", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("X-Test-Header", "test_header")
+
+	resp, err := at.RoundTrip(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	newURL := "http://localhost?key=API_KEY"
+	if resp.Request.URL.String() != newURL {
+		t.Errorf("newReq.URL.String() = %q; want %q", resp.Request.URL.String(), newURL)
+	}
+
+	headerTests := []struct {
+		key, origValue, newValue string
+	}{
+		{"X-Test-Header", "test_header", "test_header"},
+		{"User-Agent", "", "gitkit-go-client/0.1"},
 	}
 	newReq := resp.Request
 	for i, ht := range headerTests {

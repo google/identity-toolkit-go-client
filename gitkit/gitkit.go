@@ -30,10 +30,7 @@ To create a new gitkit client:
 package gitkit
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
@@ -46,114 +43,59 @@ const (
 	publicCertsURL       = "https://www.googleapis.com/identitytoolkit/v3/relyingparty/publicKeys"
 )
 
-// Config contains the configurations for creating a Client.
-type Config struct {
-	// ClientID is the Google OAuth2 client ID for the server.
-	ClientID string `json:"clientId,omitempty"`
-	// WidgetURL is the identitytoolkit javascript widget URL.
-	// It is used to generate the reset password or change email URL and
-	// could be an absolute URL, an absolute path or a relative path.
-	WidgetURL string `json:"widgetUrl,omitempty"`
-	// WidgetModeParamName is the parameter name used by the javascript widget.
-	// A default value is used if left unspecified. If the parameter name is set
-	// to other value in the javascript widget, this field should be set to the
-	// same value.
-	WidgetModeParamName string `json:"widgetModeParamName,omitempty"`
-	// CookieName is the name of the cookie that stores the ID token.
-	CookieName string `json:"cookieName,omitempty"`
-	// ServerAPIKey is the API key for the server to fetch the identitytoolkit
-	// public certificates.
-	ServerAPIKey string `json:"serverApiKey,omitempty"`
-	// ServiceAccount is the Google OAuth2 service account email address.
-	ServiceAccount string `json:"serviceAccountEmail,omitempty"`
-	// PEMKeyPath is the path of the PEM enconding private key file for the
-	// service account.
-	// When obtaining a key from the Google API console it will be  downloaded
-	// in a PKCS12 encoding, which can be converted to PEM encoding by openssl:
-	//
-	//	$ openssl pkcs12 -in <key.p12> -nocerts -passin pass:notasecret -nodes -out <key.pem>
-	PEMKeyPath string `json:"serviceAccountPrivateKeyFile,omitempty"`
-	// PEMKey is the PEM enconding private key for the service account.
-	// Either PEMKeyPath or PEMKey should be provided if a service account is
-	// required.
-	PEMKey []byte `json:"-"`
-}
-
-// LoadConfig loads the configuration from the config file specified by path.
-func LoadConfig(path string) (*Config, error) {
-	b, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	var c Config
-	if err := json.Unmarshal(b, &c); err != nil {
-		return nil, err
-	}
-	return &c, nil
-}
-
 // Client provides convenient utilities for integrating identitytoolkit service
 // into a web service.
 type Client struct {
 	config    *Config
 	widgetURL *url.URL
-	apiClient *APIClient
 	certs     *Certificates
+
+	authenticator Authenticator
+	transport     http.RoundTripper
 }
 
-const (
-	defaultWidgetModeParamName = "mode"
-	defaultCookieName          = "gtoken"
-)
-
 // New creates a Client from the configuration.
-// If the transport is nil, a ServiceAccountTransport is used and the service
-// account and PEM key should be specified in the configuration.
-func New(config *Config, transport http.RoundTripper) (*Client, error) {
+func New(config *Config) (*Client, error) {
 	conf := *config
-	if conf.ClientID == "" {
-		return nil, errors.New("missing ClientID in config")
-	}
-	if conf.WidgetURL == "" {
-		return nil, errors.New("missing WidgetURL in config")
+	requireServiceAccountInfo := !runInGAEProd()
+	if err := conf.normalize(requireServiceAccountInfo); err != nil {
+		return nil, err
 	}
 	widgetURL, err := url.Parse(conf.WidgetURL)
 	if err != nil {
 		return nil, fmt.Errorf("invalid WidgetURL: %s", conf.WidgetURL)
 	}
-	if conf.WidgetModeParamName == "" {
-		conf.WidgetModeParamName = defaultWidgetModeParamName
-	}
-	if conf.CookieName == "" {
-		conf.CookieName = defaultCookieName
-	}
-	if transport == nil {
-		if conf.ServiceAccount == "" {
-			return nil, errors.New("missing ServiceAccount in config")
-		}
-		if len(conf.PEMKey) == 0 {
-			if conf.PEMKeyPath == "" {
-				return nil, errors.New("missing PEMKey or PEMKeyPath in config")
-			}
-			key, err := ioutil.ReadFile(conf.PEMKeyPath)
-			if err != nil {
-				return nil, err
-			}
-			conf.PEMKey = key
-		}
-		transport = &ServiceAccountTransport{
-			Assertion: jwt.NewToken(conf.ServiceAccount, identitytoolkitScope, conf.PEMKey),
+	certs := &Certificates{URL: publicCertsURL}
+	var authenticator Authenticator
+	if conf.ServiceAccount != "" && len(conf.PEMKey) != 0 {
+		authenticator = &PEMKeyAuthenticator{
+			assertion: jwt.NewToken(conf.ServiceAccount, identitytoolkitScope, conf.PEMKey),
 		}
 	}
-	api := APIClient{http.Client{Transport: transport}}
-	if conf.ServerAPIKey == "" {
-		return nil, errors.New("missing ServerAPIKey in config")
+	return &Client{
+		config:        &conf,
+		widgetURL:     widgetURL,
+		authenticator: authenticator,
+		certs:         certs,
+	}, nil
+}
+
+func (c *Client) defaultTransport() http.RoundTripper {
+	if c.transport == nil {
+		return http.DefaultTransport
 	}
-	certs, err := LoadCerts(fmt.Sprintf("%s?key=%s", publicCertsURL, conf.ServerAPIKey), transport)
-	if err != nil {
-		return nil, err
+	return c.transport
+}
+
+func (c *Client) apiClient() *APIClient {
+	return &APIClient{
+		http.Client{
+			Transport: &ServiceAccountTransport{
+				Auth:      c.authenticator,
+				Transport: c.defaultTransport(),
+			},
+		},
 	}
-	return &Client{config: &conf, widgetURL: widgetURL, apiClient: &api, certs: certs}, nil
 }
 
 // TokenFromRequest extracts the ID token from the HTTP request if present.
@@ -170,6 +112,10 @@ func (c *Client) TokenFromRequest(req *http.Request) string {
 // Beside verifying the token is a valid JWT, it also validates that the token
 // is not expired and is issued to the client.
 func (c *Client) ValidateToken(token string) (*User, error) {
+	transport := &APIKeyTransport{c.config.ServerAPIKey, c.defaultTransport()}
+	if err := c.certs.LoadIfNecessary(transport); err != nil {
+		return nil, err
+	}
 	t, err := VerifyToken(token, c.certs)
 	if err != nil {
 		return nil, err
@@ -209,7 +155,7 @@ func (c *Client) UserByToken(token string) (*User, error) {
 // UserByEmail retrieves the account information of the user specified by the
 // email address.
 func (c *Client) UserByEmail(email string) (*User, error) {
-	resp, err := c.apiClient.GetAccountInfo(&GetAccountInfoRequest{Emails: []string{email}})
+	resp, err := c.apiClient().GetAccountInfo(&GetAccountInfoRequest{Emails: []string{email}})
 	if err != nil {
 		return nil, err
 	}
@@ -222,7 +168,7 @@ func (c *Client) UserByEmail(email string) (*User, error) {
 // UserByLocalID retrieves the account information of the user specified by the
 // local ID.
 func (c *Client) UserByLocalID(localID string) (*User, error) {
-	resp, err := c.apiClient.GetAccountInfo(&GetAccountInfoRequest{LocalIDs: []string{localID}})
+	resp, err := c.apiClient().GetAccountInfo(&GetAccountInfoRequest{LocalIDs: []string{localID}})
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +180,7 @@ func (c *Client) UserByLocalID(localID string) (*User, error) {
 
 // UpdateUser updates the account information of the user.
 func (c *Client) UpdateUser(user *User) error {
-	_, err := c.apiClient.SetAccountInfo(&SetAccountInfoRequest{
+	_, err := c.apiClient().SetAccountInfo(&SetAccountInfoRequest{
 		LocalID:       user.LocalID,
 		Email:         user.Email,
 		DisplayName:   user.DisplayName,
@@ -245,7 +191,7 @@ func (c *Client) UpdateUser(user *User) error {
 
 // DeleteUser deletes a user specified by the local ID.
 func (c *Client) DeleteUser(user *User) error {
-	_, err := c.apiClient.DeleteAccount(&DeleteAccountRequest{LocalID: user.LocalID})
+	_, err := c.apiClient().DeleteAccount(&DeleteAccountRequest{LocalID: user.LocalID})
 	return err
 }
 
@@ -253,7 +199,7 @@ func (c *Client) DeleteUser(user *User) error {
 // algorithm, key, saltSeparator specify the password hash algorithm, signer key
 // and separator between password and salt accordingly.
 func (c *Client) UploadUsers(users []*User, algorithm string, key, saltSeparator []byte) error {
-	resp, err := c.apiClient.UploadAccount(&UploadAccountRequest{users, algorithm, key, saltSeparator})
+	resp, err := c.apiClient().UploadAccount(&UploadAccountRequest{users, algorithm, key, saltSeparator})
 	if err != nil {
 		return err
 	}
@@ -267,7 +213,7 @@ func (c *Client) UploadUsers(users []*User, algorithm string, key, saltSeparator
 // For the first n users, the pageToken should be empty. Upon success, the users
 // and pageToken for next n users are returned.
 func (c *Client) ListUsersN(n int, pageToken string) ([]*User, string, error) {
-	resp, err := c.apiClient.DownloadAccount(&DownloadAccountRequest{n, pageToken})
+	resp, err := c.apiClient().DownloadAccount(&DownloadAccountRequest{n, pageToken})
 	if err != nil {
 		return nil, "", err
 	}
@@ -399,7 +345,7 @@ func (c *Client) GenerateOOBCode(req *http.Request) (*OOBCodeResponse, error) {
 		Token:            token,
 		UserIP:           extractRemoteIP(req),
 	}
-	resp, err := c.apiClient.GetOOBCode(r)
+	resp, err := c.apiClient().GetOOBCode(r)
 	if err != nil {
 		return nil, err
 	}
