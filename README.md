@@ -1,4 +1,5 @@
 This is the Go client library for Google Identity Toolkit services.
+Documentation at http://godoc.org/github.com/google/identity-toolkit-go-client/gitkit
 
 The `gitkit` package provides convenient utilities for websites to integrate with Google Identity Toolkit service.
 
