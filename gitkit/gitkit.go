@@ -149,7 +149,7 @@ func New(config *Config, transport http.RoundTripper) (*Client, error) {
 	if conf.ServerAPIKey == "" {
 		return nil, errors.New("missing ServerAPIKey in config")
 	}
-	certs, err := LoadCerts(fmt.Sprintf("%s?key=%s", publicCertsURL, conf.ServerAPIKey))
+	certs, err := LoadCerts(fmt.Sprintf("%s?key=%s", publicCertsURL, conf.ServerAPIKey), transport)
 	if err != nil {
 		return nil, err
 	}

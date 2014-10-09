@@ -40,9 +40,9 @@ type Certificates struct {
 }
 
 // LoadCerts downloads the certificates from the given URL.
-func LoadCerts(url string) (*Certificates, error) {
+func LoadCerts(url string, transport http.RoundTripper) (*Certificates, error) {
 	c := Certificates{url: url}
-	c.update()
+	c.update(transport)
 	if c.err != nil {
 		return nil, c.err
 	}
@@ -66,8 +66,8 @@ func (c *Certificates) Cert(keyID string) (*x509.Certificate, error) {
 const retryInterval = 30 * time.Second
 
 // update fetches the certificates and starts a time for the next update.
-func (c *Certificates) update() {
-	certs, cacheTime, err := downloadCerts(c.url)
+func (c *Certificates) update(transport http.RoundTripper) {
+	certs, cacheTime, err := downloadCerts(c.url, transport)
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.err = err
@@ -81,12 +81,13 @@ func (c *Certificates) update() {
 	if c.t != nil {
 		c.t.Stop()
 	}
-	c.t = time.AfterFunc(cacheTime, func() { c.update() })
+	c.t = time.AfterFunc(cacheTime, func() { c.update(transport) })
 }
 
 // downloadCerts downloads and parses the certificates from the given URL.
-func downloadCerts(url string) (map[string]*x509.Certificate, time.Duration, error) {
-	resp, err := http.Get(url)
+func downloadCerts(url string, transport http.RoundTripper) (map[string]*x509.Certificate, time.Duration, error) {
+	client := http.Client{Transport: transport}
+	resp, err := client.Get(url)
 	if err != nil {
 		return nil, 0, err
 	}
