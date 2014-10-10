@@ -17,6 +17,7 @@
 package gitkit
 
 import (
+	"errors"
 	"net/http"
 	"sync"
 
@@ -41,7 +42,7 @@ type GAEAppAuthenticator struct {
 }
 
 // AccessToken implements Authenticator interface
-func (a GAEAppAuthenticator) AccessToken(http.RoundTripper) (string, error) {
+func (a *GAEAppAuthenticator) AccessToken(http.RoundTripper) (string, error) {
 	gaeAppTokenMu.Lock()
 	defer gaeAppTokenMu.Unlock()
 
@@ -58,11 +59,16 @@ func (a GAEAppAuthenticator) AccessToken(http.RoundTripper) (string, error) {
 	return gaeAppToken.AccessToken, nil
 }
 
-func WithContext(ctx appengine.Context, client *Client) *Client {
+// NewWithContext creates a Client from the global one and associates it with an
+// appengine.Context, which is required by most appengine APIs.
+func NewWithContext(ctx appengine.Context, client *Client) (*Client, error) {
+	if _, isGAEAuth := client.authenticator.(*GAEAppAuthenticator); isGAEAuth {
+		return nil, errors.New("global client shouldn't have GAEAppAuthenticator")
+	}
 	newClient := *client
 	if newClient.authenticator == nil {
-		newClient.authenticator = GAEAppAuthenticator{ctx}
+		newClient.authenticator = &GAEAppAuthenticator{ctx}
 	}
 	newClient.transport = urlfetch.Client(ctx).Transport
-	return &newClient
+	return &newClient, nil
 }
