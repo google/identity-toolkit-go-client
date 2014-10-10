@@ -12,21 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/*
-Package gitkit provides convenient utilities for third party website to
-integrate Google Identity Toolkit.
-
-See more at https://developers.google.com/identity-toolkit
-
-To create a new gitkit client:
-	config := gitkit.Config{
-		ClientID: "123.apps.googleusercontent.com",
-		WidgetURL: "http://localhost/gitkit",
-		ServiceAccount: "123-abc@developer.gserviceaccount.com",
-		PEMKeyPath: "private-key.pem",
-	}
-	c, err := gitkit.New(&config, nil)
-*/
 package gitkit
 
 import (
