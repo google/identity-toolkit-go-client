@@ -75,9 +75,6 @@ func (conf *Config) normalize(requireServiceAccountInfo bool) error {
 	if conf.ClientID == "" {
 		return errors.New("missing ClientID in config")
 	}
-	if conf.WidgetURL == "" {
-		return errors.New("missing WidgetURL in config")
-	}
 	if conf.WidgetModeParamName == "" {
 		conf.WidgetModeParamName = defaultWidgetModeParamName
 	}

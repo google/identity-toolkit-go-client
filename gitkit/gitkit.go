@@ -46,11 +46,15 @@ func New(config *Config) (*Client, error) {
 	if err := conf.normalize(requireServiceAccountInfo); err != nil {
 		return nil, err
 	}
-	widgetURL, err := url.Parse(conf.WidgetURL)
-	if err != nil {
-		return nil, fmt.Errorf("invalid WidgetURL: %s", conf.WidgetURL)
-	}
 	certs := &Certificates{URL: publicCertsURL}
+	var widgetURL *url.URL
+	if conf.WidgetURL != "" {
+		var err error
+		widgetURL, err = url.Parse(conf.WidgetURL)
+		if err != nil {
+			return nil, fmt.Errorf("invalid WidgetURL: %s", conf.WidgetURL)
+		}
+	}
 	var authenticator Authenticator
 	if conf.ServiceAccount != "" && len(conf.PEMKey) != 0 {
 		authenticator = &PEMKeyAuthenticator{
