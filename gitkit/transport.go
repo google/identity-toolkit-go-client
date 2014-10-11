@@ -52,7 +52,7 @@ func (a *PEMKeyAuthenticator) AccessToken(r http.RoundTripper) (string, error) {
 	return a.token.AccessToken, nil
 }
 
-const clientUserAgent = "gitkit-go-client/0.1"
+const clientUserAgent = "gitkit-go-client/0.1.1"
 
 // ServiceAccountTransport is an implementation of http.RoundTripper that can
 // automatically fetch an access token for the service account to access
