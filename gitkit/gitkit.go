@@ -280,6 +280,7 @@ const (
 // Acceptable OOB code request types.
 const (
 	OOBActionChangeEmail   = "changeEmail"
+	OOBActionVerifyEmail   = "verifyEmail"
 	OOBActionResetPassword = "resetPassword"
 )
 
@@ -297,50 +298,117 @@ type OOBCodeResponse struct {
 	// The URL that contains the OOB code and can be sent to the user for
 	// confirming the action, e.g., sending the URL to the email address and
 	// the user can click the URL to continue to reset the password.
-	OOBCodeURL string
+	// It can be nil if WidgetURL is not provided in the configuration.
+	OOBCodeURL *url.URL
 }
 
 // GenerateOOBCode generates an OOB code based on the request.
 func (c *Client) GenerateOOBCode(req *http.Request) (*OOBCodeResponse, error) {
 	q := req.URL.Query()
-	action := q.Get(OOBActionParam)
-	var requestType, email, newEmail, captchaChallenge, captchaResponse, token string
-	switch action {
+	switch action := q.Get(OOBActionParam); action {
 	case OOBActionResetPassword:
-		requestType = ResetPasswordRequestType
-		email = q.Get(OOBEmailParam)
-		captchaChallenge = q.Get(OOBCAPTCHAChallengeParam)
-		captchaResponse = q.Get(OOBCAPTCHAResponseParam)
+		return c.GenerateResetPasswordOOBCode(
+			req,
+			q.Get(OOBEmailParam),
+			q.Get(OOBCAPTCHAChallengeParam),
+			q.Get(OOBCAPTCHAResponseParam))
 	case OOBActionChangeEmail:
-		requestType = ChangeEmailRequestType
-		email = q.Get(OOBEmailParam)
-		newEmail = q.Get(OOBNewEmailParam)
-		token = c.TokenFromRequest(req)
+		return c.GenerateChangeEmailOOBCode(
+			req,
+			q.Get(OOBEmailParam),
+			q.Get(OOBNewEmailParam),
+			c.TokenFromRequest(req))
+	case OOBActionVerifyEmail:
+		return c.GenerateVerifyEmailOOBCode(req, q.Get(OOBEmailParam))
 	default:
 		return nil, fmt.Errorf("unrecognized action: %s", action)
 	}
+}
 
-	// Set all possible fields in request and let APIClient do the validation.
+// GenerateResetPasswordOOBCode generates an OOB code for resetting password.
+//
+// If WidgetURL is not provided in the configuration, the OOBCodeURL field in
+// the returned OOBCodeResponse is nil.
+func (c *Client) GenerateResetPasswordOOBCode(
+	req *http.Request, email, captchaChallenge, captchaResponse string) (*OOBCodeResponse, error) {
 	r := &GetOOBCodeRequest{
-		RequestType:      requestType,
+		RequestType:      ResetPasswordRequestType,
 		Email:            email,
 		CAPTCHAChallenge: captchaChallenge,
 		CAPTCHAResponse:  captchaResponse,
-		NewEmail:         newEmail,
-		Token:            token,
 		UserIP:           extractRemoteIP(req),
 	}
 	resp, err := c.apiClient().GetOOBCode(r)
 	if err != nil {
 		return nil, err
 	}
+	return &OOBCodeResponse{
+		Action:     OOBActionResetPassword,
+		Email:      email,
+		OOBCode:    resp.OOBCode,
+		OOBCodeURL: c.buildOOBCodeURL(req, OOBActionResetPassword, resp.OOBCode),
+	}, nil
+}
 
-	// Build the OOB code URL.
+// GenerateChangeEmailOOBCode generates an OOB code for changing email address.
+//
+// If WidgetURL is not provided in the configuration, the OOBCodeURL field in
+// the returned OOBCodeResponse is nil.
+func (c *Client) GenerateChangeEmailOOBCode(
+	req *http.Request, email, newEmail, token string) (*OOBCodeResponse, error) {
+	r := &GetOOBCodeRequest{
+		RequestType: ChangeEmailRequestType,
+		Email:       email,
+		NewEmail:    email,
+		Token:       token,
+		UserIP:      extractRemoteIP(req),
+	}
+	resp, err := c.apiClient().GetOOBCode(r)
+	if err != nil {
+		return nil, err
+	}
+	return &OOBCodeResponse{
+		Action:     OOBActionChangeEmail,
+		Email:      email,
+		NewEmail:   newEmail,
+		OOBCode:    resp.OOBCode,
+		OOBCodeURL: c.buildOOBCodeURL(req, OOBActionChangeEmail, resp.OOBCode),
+	}, nil
+}
+
+// GenerateVerifyEmailOOBCode generates an OOB code for verifying email address.
+//
+// If WidgetURL is not provided in the configuration, the OOBCodeURL field in
+// the returned OOBCodeResponse is nil.
+func (c *Client) GenerateVerifyEmailOOBCode(req *http.Request, email string) (*OOBCodeResponse, error) {
+	r := &GetOOBCodeRequest{
+		RequestType: VerifyEmailRequestType,
+		Email:       email,
+		UserIP:      extractRemoteIP(req),
+	}
+	resp, err := c.apiClient().GetOOBCode(r)
+	if err != nil {
+		return nil, err
+	}
+	return &OOBCodeResponse{
+		Action:     OOBActionVerifyEmail,
+		Email:      email,
+		OOBCode:    resp.OOBCode,
+		OOBCodeURL: c.buildOOBCodeURL(req, OOBActionVerifyEmail, resp.OOBCode),
+	}, nil
+}
+
+func (c *Client) buildOOBCodeURL(req *http.Request, action, oobCode string) *url.URL {
+	// Return nil if widget URL is not provided.
+	if c.widgetURL == nil {
+		return nil
+	}
 	url := extractRequestURL(req).ResolveReference(c.widgetURL)
-	url.Query().Set(c.config.WidgetModeParamName, action)
-	url.Query().Set(OOBCodeParam, resp.OOBCode)
-
-	return &OOBCodeResponse{action, email, newEmail, resp.OOBCode, url.String()}, nil
+	q := url.Query()
+	q.Set(c.config.WidgetModeParamName, action)
+	q.Set(OOBCodeParam, oobCode)
+	url.RawQuery = q.Encode()
+	return url
 }
 
 // SuccessResponse generates a JSON response which indicates the request is

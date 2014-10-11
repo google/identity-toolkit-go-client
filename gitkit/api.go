@@ -329,18 +329,22 @@ func (c *APIClient) DownloadAccount(req *DownloadAccountRequest) (*DownloadAccou
 const (
 	ResetPasswordRequestType = "PASSWORD_RESET"
 	ChangeEmailRequestType   = "NEW_EMAIL_ACCEPT"
+	VerifyEmailRequestType   = "VERIFY_EMAIL"
 )
 
 // GetOOBCodeRequest contains the information to get an OOB code
 // from identitytoolkit service.
 //
-// There are two kinds of OOB code:
+// There are three kinds of OOB code:
 //
 // 1. OOB code for password recovery. The RequestType should be PASSWORD_RESET
 // and Email, CAPTCHAChallenge and CAPTCHAResponse are required.
 //
 // 2. OOB code for email change. The RequestType should be NEW_EMAIL_ACCEPT and
 // Email, newEmail and Token are required.
+//
+// 3. OOB code for email verification. The RequestType should be VERIFY_EMAIL
+// and Email is required.
 type GetOOBCodeRequest struct {
 	RequestType      string `json:"requestType,omitempty"`
 	Email            string `json:"email,omitempty"`
@@ -380,6 +384,11 @@ func (c *APIClient) GetOOBCode(req *GetOOBCodeRequest) (*GetOOBCodeResponse, err
 		}
 		if req.Token == "" {
 			return nil, fmt.Errorf("GetOOBCode: must provide the Gitkit token")
+		}
+
+	case VerifyEmailRequestType:
+		if req.Email == "" {
+			return nil, fmt.Errorf("GetOOBCode: must provide an email")
 		}
 
 	default:
