@@ -67,7 +67,7 @@ func TestServiceAccountTransport(t *testing.T) {
 	}{
 		{"X-Test-Header", "test_header", "test_header"},
 		{"Authorization", "", "Bearer access_token"},
-		{"User-Agent", "", "gitkit-go-client/0.1"},
+		{"User-Agent", "", "gitkit-go-client/0.1.1"},
 		{"Content-type", "", "application/json"},
 	}
 	newReq := resp.Request
@@ -107,7 +107,7 @@ func TestAPIKeyTransport(t *testing.T) {
 		key, origValue, newValue string
 	}{
 		{"X-Test-Header", "test_header", "test_header"},
-		{"User-Agent", "", "gitkit-go-client/0.1"},
+		{"User-Agent", "", "gitkit-go-client/0.1.1"},
 	}
 	newReq := resp.Request
 	for i, ht := range headerTests {
