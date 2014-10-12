@@ -271,6 +271,7 @@ const (
 	OOBEmailParam            = "email"
 	OOBCAPTCHAChallengeParam = "challenge"
 	OOBCAPTCHAResponseParam  = "response"
+	OOBOldEmailParam         = "oldEmail"
 	OOBNewEmailParam         = "newEmail"
 	OOBCodeParam             = "oobCode"
 )
@@ -302,22 +303,21 @@ type OOBCodeResponse struct {
 
 // GenerateOOBCode generates an OOB code based on the request.
 func (c *Client) GenerateOOBCode(req *http.Request) (*OOBCodeResponse, error) {
-	q := req.URL.Query()
-	switch action := q.Get(OOBActionParam); action {
+	switch action := req.PostFormValue(OOBActionParam); action {
 	case OOBActionResetPassword:
 		return c.GenerateResetPasswordOOBCode(
 			req,
-			q.Get(OOBEmailParam),
-			q.Get(OOBCAPTCHAChallengeParam),
-			q.Get(OOBCAPTCHAResponseParam))
+			req.PostFormValue(OOBEmailParam),
+			req.PostFormValue(OOBCAPTCHAChallengeParam),
+			req.PostFormValue(OOBCAPTCHAResponseParam))
 	case OOBActionChangeEmail:
 		return c.GenerateChangeEmailOOBCode(
 			req,
-			q.Get(OOBEmailParam),
-			q.Get(OOBNewEmailParam),
+			req.PostFormValue(OOBOldEmailParam),
+			req.PostFormValue(OOBNewEmailParam),
 			c.TokenFromRequest(req))
 	case OOBActionVerifyEmail:
-		return c.GenerateVerifyEmailOOBCode(req, q.Get(OOBEmailParam))
+		return c.GenerateVerifyEmailOOBCode(req, req.PostFormValue(OOBEmailParam))
 	default:
 		return nil, fmt.Errorf("unrecognized action: %s", action)
 	}
@@ -357,7 +357,7 @@ func (c *Client) GenerateChangeEmailOOBCode(
 	r := &GetOOBCodeRequest{
 		RequestType: ChangeEmailRequestType,
 		Email:       email,
-		NewEmail:    email,
+		NewEmail:    newEmail,
 		Token:       token,
 		UserIP:      extractRemoteIP(req),
 	}
