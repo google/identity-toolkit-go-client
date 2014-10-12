@@ -48,6 +48,8 @@ type Token struct {
 	// ProviderID is the identifier for the identity provider (IDP) for the
 	// user. It is usually the top level domain of the IDP, e.g., google.com.
 	ProviderID string
+	// The token string.
+	TokenString string
 }
 
 // Expired checks whether or not the ID token is expired.
@@ -115,6 +117,7 @@ func VerifyToken(token string, certs *Certificates) (*Token, error) {
 		Email:         t.Email,
 		EmailVerified: t.Verified,
 		ProviderID:    t.ProviderID,
+		TokenString:   token,
 	}, nil
 }
 

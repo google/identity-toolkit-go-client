@@ -10,13 +10,15 @@ To use Identity Toolkit Go client in your own server:
 var client *gitkit.Client
 
 func handleSignIn(w http.ResponseWriter, r *http.Request) {
-	token := client.TokenFromRequest(r)
-	user := client.ValidateToken(token)
-	if user != nil {
-		// Token is validate and user contains the user account information
-		// including user ID, email address, etc.
-		// Issue your own session cookie to finish the sign in.
+	// If there is no valid session, check identity tookit ID token.
+	ts := client.TokenFromRequest(r)
+	token, err := client.ValidateToken(ts)
+	if err != nil {
+		// Not a valid token. Handle error.
 	}
+	// Token is validate and it contains the user account information
+	// including user ID, email address, etc.
+	// Issue your own session cookie to finish the sign in.
 }
 
 func main() {
@@ -48,6 +50,7 @@ in a Google App Engine app.
 var client *gitkit.Client
 
 func handleSignIn(w http.ResponseWriter, r *http.Request) {
+	// If there is no valid session, check identity tookit ID token.
 	// gitkit.NewWithContext needs to be called with the appengine.Context
 	// such that the new client is associated with it since most App Engine
 	// APIs require a context.
@@ -58,13 +61,14 @@ func handleSignIn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate the token in the same way.
-	token := c.TokenFromRequest(r)
-	user := c.ValidateToken(token)
-	if user != nil {
-		// Token is validate and user contains the user account information
-		// including user ID, email address, etc.
-		// Issue your own session cookie to finish the sign in.
+	ts := client.TokenFromRequest(r)
+	token, err := client.ValidateToken(ts)
+	if err != nil {
+		// Not a valid token. Handle error.
 	}
+	// Token is validate and it contains the user account information
+	// including user ID, email address, etc.
+	// Issue your own session cookie to finish the sign in.
 }
 
 func init() {
@@ -94,7 +98,8 @@ func init() {
 
 The client also provides other methods to help manage user account, for example,
 
-To fetch the account information:
+To validate the token and also fetch the account information from identity
+toolkit service:
 ```
 user, err := client.UserByToken(token)
 ```

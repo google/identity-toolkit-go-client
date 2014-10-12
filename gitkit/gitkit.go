@@ -96,11 +96,11 @@ func (c *Client) TokenFromRequest(req *http.Request) string {
 	return cookie.Value
 }
 
-// ValidateToken validates the ID token and returns a User with fields populated
-// from the ID token.
+// ValidateToken validates the ID token and returns a Token.
+//
 // Beside verifying the token is a valid JWT, it also validates that the token
 // is not expired and is issued to the client.
-func (c *Client) ValidateToken(token string) (*User, error) {
+func (c *Client) ValidateToken(token string) (*Token, error) {
 	transport := &APIKeyTransport{c.config.ServerAPIKey, c.defaultTransport()}
 	if err := c.certs.LoadIfNecessary(transport); err != nil {
 		return nil, err
@@ -115,25 +115,19 @@ func (c *Client) ValidateToken(token string) (*User, error) {
 	if t.Audience != c.config.ClientID {
 		return nil, fmt.Errorf("incorrect audience in token: %s", t.Audience)
 	}
-	u := &User{
-		LocalID:       t.LocalID,
-		Email:         t.Email,
-		EmailVerified: t.EmailVerified,
-		ProviderID:    t.ProviderID,
-	}
-	return u, nil
+	return t, nil
 }
 
 // UserByToken retrieves the account information of the user specified by the ID
 // token.
 func (c *Client) UserByToken(token string) (*User, error) {
-	u, err := c.ValidateToken(token)
+	t, err := c.ValidateToken(token)
 	if err != nil {
 		return nil, err
 	}
-	localID := u.LocalID
-	providerID := u.ProviderID
-	u, err = c.UserByLocalID(localID)
+	localID := t.LocalID
+	providerID := t.ProviderID
+	u, err := c.UserByLocalID(localID)
 	if err != nil {
 		return nil, err
 	}

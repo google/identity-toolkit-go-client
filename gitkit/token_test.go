@@ -83,6 +83,19 @@ JeyA5HMQFyXEsbPg/i9Xwwx0jerQQHVwG4y2Ew6IPAjX7kSZC2RGX5U=
 	return &Certificates{certs: map[string]*x509.Certificate{"40QoZg": cert}}
 }
 
+const validToken = "eyJhbGciOiJSUzI1NiIsImtpZCI6IjQwUW9aZyJ9.eyJpc3MiOiJodHRwczov" +
+	"L2dpdGtpdC5nb29nbGUuY29tLyIsImF1ZCI6IjIxNzkyMzM5MzU3My5hcHBzL" +
+	"mdvb2dsZXVzZXJjb250ZW50LmNvbSIsImlhdCI6MTQwMDQzNzcxNSwiZXhwIj" +
+	"oxNDAxNjQ3MzE1LCJ1c2VyX2lkIjoiMTYxMDk4NTc3NjA2MDcxMDYwODAiLCJ" +
+	"lbWFpbCI6ImdpdGtpdHRlc3RAZ21haWwuY29tIiwicHJvdmlkZXJfaWQiOiJn" +
+	"b29nbGUuY29tIiwidmVyaWZpZWQiOnRydWV9.U_A882B6Msd3D3n0ADLeAuuk" +
+	"spTI1DDmDzn6NkXKN1oUhuk8E0scVRziYYz4kMBvlRo0RynWe-VijOt4v2uYy" +
+	"xLvPD176FsJmTqdVcUJUDtkhzzmthB1ndtezgNr-HrpZAVpJd0fy8eJ7zmNIG" +
+	"AI8OpoWk5Ku9IsC2DcOwt4Hi3daeFRm0uceO4C27lez3loHDmIG-zWSWoNjic" +
+	"GNJ5qNya7lowSYOQOEgBcvVQeOrMz26B09SavrJ9rYAER-KgPXDxvOD7_7IYd" +
+	"4ja2ThVG0RjKfvDLCgmg6nMIRl0ZW-Bn3FhwHo74NNF7KMF_QuzAvD2hnuesa" +
+	"JlaIdAFyIk9WA"
+
 func TestVerifyToken(t *testing.T) {
 	certs := initCerts()
 	tokenTests := []struct {
@@ -90,18 +103,7 @@ func TestVerifyToken(t *testing.T) {
 		t *Token
 	}{
 		{
-			"eyJhbGciOiJSUzI1NiIsImtpZCI6IjQwUW9aZyJ9.eyJpc3MiOiJodHRwczov" +
-				"L2dpdGtpdC5nb29nbGUuY29tLyIsImF1ZCI6IjIxNzkyMzM5MzU3My5hcHBzL" +
-				"mdvb2dsZXVzZXJjb250ZW50LmNvbSIsImlhdCI6MTQwMDQzNzcxNSwiZXhwIj" +
-				"oxNDAxNjQ3MzE1LCJ1c2VyX2lkIjoiMTYxMDk4NTc3NjA2MDcxMDYwODAiLCJ" +
-				"lbWFpbCI6ImdpdGtpdHRlc3RAZ21haWwuY29tIiwicHJvdmlkZXJfaWQiOiJn" +
-				"b29nbGUuY29tIiwidmVyaWZpZWQiOnRydWV9.U_A882B6Msd3D3n0ADLeAuuk" +
-				"spTI1DDmDzn6NkXKN1oUhuk8E0scVRziYYz4kMBvlRo0RynWe-VijOt4v2uYy" +
-				"xLvPD176FsJmTqdVcUJUDtkhzzmthB1ndtezgNr-HrpZAVpJd0fy8eJ7zmNIG" +
-				"AI8OpoWk5Ku9IsC2DcOwt4Hi3daeFRm0uceO4C27lez3loHDmIG-zWSWoNjic" +
-				"GNJ5qNya7lowSYOQOEgBcvVQeOrMz26B09SavrJ9rYAER-KgPXDxvOD7_7IYd" +
-				"4ja2ThVG0RjKfvDLCgmg6nMIRl0ZW-Bn3FhwHo74NNF7KMF_QuzAvD2hnuesa" +
-				"JlaIdAFyIk9WA",
+			validToken,
 			&Token{
 				Issuer:        "https://gitkit.google.com/",
 				Audience:      "217923393573.apps.googleusercontent.com",
@@ -110,6 +112,7 @@ func TestVerifyToken(t *testing.T) {
 				LocalID:       "16109857760607106080",
 				Email:         "gitkittest@gmail.com",
 				EmailVerified: true,
+				TokenString:   validToken,
 			},
 		},
 		{
