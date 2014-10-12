@@ -23,6 +23,62 @@ import (
 	"testing"
 )
 
+func TestBuildOOBCodeURL(t *testing.T) {
+	oobURLTests := []struct {
+		widgetURL string
+		r         *http.Request
+		action    string
+		oobCode   string
+		url       *url.URL // Result OOB code URL
+	}{
+		// No widgte URL.
+		{
+			"",
+			&http.Request{Host: "localhost", URL: &url.URL{Path: "/oobAction"}},
+			"resetPassword",
+			"OOBCode",
+			nil,
+		},
+		// Relatvie widget URL.
+		{
+			"/widget",
+			&http.Request{Host: "localhost", URL: &url.URL{Path: "/oobAction"}},
+			"changeEmail",
+			"OOBCode",
+			&url.URL{
+				Scheme:   "http",
+				Host:     "localhost",
+				Path:     "/widget",
+				RawQuery: "mode=changeEmail&oobCode=OOBCode",
+			},
+		},
+		// Absolute widget URL.
+		{
+			"http://localhost/widget",
+			&http.Request{Host: "localhost", URL: &url.URL{Path: "/oobAction"}},
+			"resetPassword",
+			"OOBCode",
+			&url.URL{
+				Scheme:   "http",
+				Host:     "localhost",
+				Path:     "/widget",
+				RawQuery: "mode=resetPassword&oobCode=OOBCode",
+			},
+		},
+	}
+	for i, ot := range oobURLTests {
+		var u *url.URL
+		if ot.widgetURL != "" {
+			u, _ = url.Parse(ot.widgetURL)
+		}
+		c := &Client{widgetURL: u, config: &Config{WidgetModeParamName: "mode"}}
+		url := c.buildOOBCodeURL(ot.r, ot.action, ot.oobCode)
+		if !((url == nil && ot.url == nil) || (url != nil && ot.url != nil && *url == *ot.url)) {
+			t.Errorf("%d. Client.buildOOBCodeURL() = %s; want %s", i, url, ot.url)
+		}
+	}
+}
+
 func TestSuccessResponse(t *testing.T) {
 	r := SuccessResponse()
 	s := struct {
