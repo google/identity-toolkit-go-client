@@ -73,8 +73,8 @@ in a Google App Engine app.
 		}
 
 		// Validate the token in the same way.
-		ts := client.TokenFromRequest(r)
-		token, err := client.ValidateToken(ts)
+		ts := c.TokenFromRequest(r)
+		token, err := c.ValidateToken(ts)
 		if err != nil {
 			// Not a valid token. Handle error.
 		}
