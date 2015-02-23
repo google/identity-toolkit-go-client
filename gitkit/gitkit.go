@@ -19,7 +19,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"strings"
 
 	"code.google.com/p/goauth2/oauth/jwt"
 )
@@ -359,12 +358,16 @@ func (c *Client) GenerateResetPasswordOOBCode(
 // the returned OOBCodeResponse is nil.
 func (c *Client) GenerateChangeEmailOOBCode(
 	req *http.Request, email, newEmail, token string) (*OOBCodeResponse, error) {
+	ip, err := extractRemoteIP(req)
+	if err != nil {
+		return nil, err
+	}
 	r := &GetOOBCodeRequest{
 		RequestType: ChangeEmailRequestType,
 		Email:       email,
 		NewEmail:    newEmail,
 		Token:       token,
-		UserIP:      extractRemoteIP(req),
+		UserIP:      ip,
 	}
 	resp, err := c.apiClient().GetOOBCode(r)
 	if err != nil {
@@ -384,10 +387,14 @@ func (c *Client) GenerateChangeEmailOOBCode(
 // If WidgetURL is not provided in the configuration, the OOBCodeURL field in
 // the returned OOBCodeResponse is nil.
 func (c *Client) GenerateVerifyEmailOOBCode(req *http.Request, email string) (*OOBCodeResponse, error) {
+	ip, err := extractRemoteIP(req)
+	if err != nil {
+		return nil, err
+	}
 	r := &GetOOBCodeRequest{
 		RequestType: VerifyEmailRequestType,
 		Email:       email,
-		UserIP:      extractRemoteIP(req),
+		UserIP:      ip,
 	}
 	resp, err := c.apiClient().GetOOBCode(r)
 	if err != nil {
@@ -438,7 +445,7 @@ func extractRequestURL(req *http.Request) *url.URL {
 func extractRemoteIP(req *http.Request) (string, error) {
 	host, _, err := net.SplitHostPort(req.RemoteAddr)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	return host, nil
 }
