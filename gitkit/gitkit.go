@@ -16,6 +16,7 @@ package gitkit
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -329,12 +330,16 @@ func (c *Client) GenerateOOBCode(req *http.Request) (*OOBCodeResponse, error) {
 // the returned OOBCodeResponse is nil.
 func (c *Client) GenerateResetPasswordOOBCode(
 	req *http.Request, email, captchaChallenge, captchaResponse string) (*OOBCodeResponse, error) {
+	ip, err := extractRemoteIP(req)
+	if err != nil {
+		return nil, err
+	}
 	r := &GetOOBCodeRequest{
 		RequestType:      ResetPasswordRequestType,
 		Email:            email,
 		CAPTCHAChallenge: captchaChallenge,
 		CAPTCHAResponse:  captchaResponse,
-		UserIP:           extractRemoteIP(req),
+		UserIP:           ip,
 	}
 	resp, err := c.apiClient().GetOOBCode(r)
 	if err != nil {
@@ -430,6 +435,10 @@ func extractRequestURL(req *http.Request) *url.URL {
 	return &url.URL{Scheme: scheme, Host: req.Host, Path: req.URL.Path}
 }
 
-func extractRemoteIP(req *http.Request) string {
-	return strings.Split(req.RemoteAddr, ":")[0]
+func extractRemoteIP(req *http.Request) (string, error) {
+	host, _, err := net.SplitHostPort(req.RemoteAddr)
+	if err != nil {
+		return nil, err
+	}
+	return host, nil
 }
