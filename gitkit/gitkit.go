@@ -16,9 +16,9 @@ package gitkit
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
-	"strings"
 
 	"code.google.com/p/goauth2/oauth/jwt"
 )
@@ -431,5 +431,10 @@ func extractRequestURL(req *http.Request) *url.URL {
 }
 
 func extractRemoteIP(req *http.Request) string {
-	return strings.Split(req.RemoteAddr, ":")[0]
+	host, _, err := net.SplitHostPort(req.RemoteAddr)
+	if err != nil {
+		// Ignore error since GAE returns V6_ADDR instead of [V6_ADDR]:port.
+		return req.RemoteAddr
+	}
+	return host
 }
