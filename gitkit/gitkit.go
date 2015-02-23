@@ -329,16 +329,12 @@ func (c *Client) GenerateOOBCode(req *http.Request) (*OOBCodeResponse, error) {
 // the returned OOBCodeResponse is nil.
 func (c *Client) GenerateResetPasswordOOBCode(
 	req *http.Request, email, captchaChallenge, captchaResponse string) (*OOBCodeResponse, error) {
-	ip, err := extractRemoteIP(req)
-	if err != nil {
-		return nil, err
-	}
 	r := &GetOOBCodeRequest{
 		RequestType:      ResetPasswordRequestType,
 		Email:            email,
 		CAPTCHAChallenge: captchaChallenge,
 		CAPTCHAResponse:  captchaResponse,
-		UserIP:           ip,
+		UserIP:           extractRemoteIP(req),
 	}
 	resp, err := c.apiClient().GetOOBCode(r)
 	if err != nil {
@@ -358,16 +354,12 @@ func (c *Client) GenerateResetPasswordOOBCode(
 // the returned OOBCodeResponse is nil.
 func (c *Client) GenerateChangeEmailOOBCode(
 	req *http.Request, email, newEmail, token string) (*OOBCodeResponse, error) {
-	ip, err := extractRemoteIP(req)
-	if err != nil {
-		return nil, err
-	}
 	r := &GetOOBCodeRequest{
 		RequestType: ChangeEmailRequestType,
 		Email:       email,
 		NewEmail:    newEmail,
 		Token:       token,
-		UserIP:      ip,
+		UserIP:      extractRemoteIP(req),
 	}
 	resp, err := c.apiClient().GetOOBCode(r)
 	if err != nil {
@@ -387,14 +379,10 @@ func (c *Client) GenerateChangeEmailOOBCode(
 // If WidgetURL is not provided in the configuration, the OOBCodeURL field in
 // the returned OOBCodeResponse is nil.
 func (c *Client) GenerateVerifyEmailOOBCode(req *http.Request, email string) (*OOBCodeResponse, error) {
-	ip, err := extractRemoteIP(req)
-	if err != nil {
-		return nil, err
-	}
 	r := &GetOOBCodeRequest{
 		RequestType: VerifyEmailRequestType,
 		Email:       email,
-		UserIP:      ip,
+		UserIP:      extractRemoteIP(req),
 	}
 	resp, err := c.apiClient().GetOOBCode(r)
 	if err != nil {
@@ -442,10 +430,11 @@ func extractRequestURL(req *http.Request) *url.URL {
 	return &url.URL{Scheme: scheme, Host: req.Host, Path: req.URL.Path}
 }
 
-func extractRemoteIP(req *http.Request) (string, error) {
+func extractRemoteIP(req *http.Request) string {
 	host, _, err := net.SplitHostPort(req.RemoteAddr)
 	if err != nil {
-		return "", err
+		// Ignore error since GAE returns V6_ADDR instead of [V6_ADDR]:port.
+		return req.RemoteAddr
 	}
-	return host, nil
+	return host
 }
