@@ -368,9 +368,6 @@ func (c *APIClient) GetOOBCode(req *GetOOBCodeRequest) (*GetOOBCodeResponse, err
 		if req.Email == "" {
 			return nil, fmt.Errorf("GetOOBCode: must provide an email")
 		}
-		if req.CAPTCHAChallenge == "" {
-			return nil, fmt.Errorf("GetOOBCode: must provide CAPTCHA challenge")
-		}
 		if req.CAPTCHAResponse == "" {
 			return nil, fmt.Errorf("GetOOBCode: must provide CAPTCHA response")
 		}
