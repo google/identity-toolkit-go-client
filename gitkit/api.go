@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"code.google.com/p/google-api-go-client/googleapi"
+	"github.com/google/google-api-go-client/googleapi"
 )
 
 // Bytes is a slice of bytes.
