@@ -18,8 +18,8 @@ import (
 	"net/http"
 	"sync"
 
-	"code.google.com/p/goauth2/oauth"
-	"code.google.com/p/goauth2/oauth/jwt"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/jwt"
 )
 
 type Authenticator interface {

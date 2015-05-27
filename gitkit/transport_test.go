@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"code.google.com/p/goauth2/oauth"
+	"golang.org/x/oauth2"
 )
 
 type roundTripper struct {

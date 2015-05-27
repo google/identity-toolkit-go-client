@@ -20,7 +20,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"code.google.com/p/goauth2/oauth/jwt"
+	"golang.org/x/oauth2/jwt"
 )
 
 const (

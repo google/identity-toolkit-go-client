@@ -24,7 +24,7 @@ import (
 	"appengine"
 	"appengine/urlfetch"
 
-	"code.google.com/p/goauth2/oauth"
+	"golang.org/x/oauth2"
 )
 
 func runInGAEProd() bool {
