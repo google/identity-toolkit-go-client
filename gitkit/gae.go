@@ -21,10 +21,10 @@ import (
 	"net/http"
 	"sync"
 
-	"golang.org/x/net/context"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/urlfetch"
 
+	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 )
 
