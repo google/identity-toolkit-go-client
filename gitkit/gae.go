@@ -42,7 +42,7 @@ type GAEAppAuthenticator struct {
 	ctx context.Context
 }
 
-// AccessToken implements Authenticator interface
+// SetContext implements Authenticator interface
 func (a *GAEAppAuthenticator) SetContext(ctx context.Context) {
 	a.ctx = ctx
 }

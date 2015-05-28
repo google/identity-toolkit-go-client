@@ -40,7 +40,7 @@ type PEMKeyAuthenticator struct {
 	ctx   context.Context
 }
 
-// AccessToken implements Authenticator interface.
+// SetContext implements Authenticator interface.
 func (a *PEMKeyAuthenticator) SetContext(ctx context.Context) {
 	a.ctx = ctx
 }
