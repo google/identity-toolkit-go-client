@@ -47,7 +47,7 @@ func (r roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 func TestServiceAccountTransport(t *testing.T) {
 	st := &ServiceAccountTransport{
 		Auth: &PEMKeyAuthenticator{
-			token: &oauth.Token{AccessToken: "access_token", Expiry: time.Now().Add(1 * time.Hour)},
+			token: &oauth2.Token{AccessToken: "access_token", Expiry: time.Now().Add(1 * time.Hour)},
 		},
 		Transport: roundTripper{},
 	}
