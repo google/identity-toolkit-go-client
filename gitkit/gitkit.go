@@ -20,12 +20,13 @@ import (
 	"net/http"
 	"net/url"
 
-	"code.google.com/p/goauth2/oauth/jwt"
+	"golang.org/x/oauth2/jwt"
 )
 
 const (
 	identitytoolkitScope = "https://www.googleapis.com/auth/identitytoolkit"
 	publicCertsURL       = "https://www.googleapis.com/identitytoolkit/v3/relyingparty/publicKeys"
+	tokenEndpointURL     = "https://www.googleapis.com/oauth2/v3/token"
 )
 
 // Client provides convenient utilities for integrating identitytoolkit service
@@ -58,7 +59,11 @@ func New(config *Config) (*Client, error) {
 	var authenticator Authenticator
 	if conf.ServiceAccount != "" && len(conf.PEMKey) != 0 {
 		authenticator = &PEMKeyAuthenticator{
-			assertion: jwt.NewToken(conf.ServiceAccount, identitytoolkitScope, conf.PEMKey),
+			assertion: &jwt.Config{
+				Email:      conf.ServiceAccount,
+				PrivateKey: conf.PEMKey,
+				Scopes:     []string{identitytoolkitScope},
+				TokenURL:   tokenEndpointURL},
 		}
 	}
 	return &Client{
