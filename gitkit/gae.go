@@ -21,10 +21,11 @@ import (
 	"net/http"
 	"sync"
 
-	"appengine"
-	"appengine/urlfetch"
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/urlfetch"
 
-	"code.google.com/p/goauth2/oauth"
+	"golang.org/x/net/context"
+	"golang.org/x/oauth2"
 )
 
 func runInGAEProd() bool {
@@ -32,13 +33,18 @@ func runInGAEProd() bool {
 }
 
 var (
-	gaeAppToken   *oauth.Token
+	gaeAppToken   *oauth2.Token
 	gaeAppTokenMu sync.Mutex
 )
 
 // GAEAppAuthenticator uses Google App Engine App Identity API to authenticate.
 type GAEAppAuthenticator struct {
-	ctx appengine.Context
+	ctx context.Context
+}
+
+// SetContext implements Authenticator interface
+func (a *GAEAppAuthenticator) SetContext(ctx context.Context) {
+	a.ctx = ctx
 }
 
 // AccessToken implements Authenticator interface
@@ -46,12 +52,12 @@ func (a *GAEAppAuthenticator) AccessToken(http.RoundTripper) (string, error) {
 	gaeAppTokenMu.Lock()
 	defer gaeAppTokenMu.Unlock()
 
-	if gaeAppToken == nil || gaeAppToken.Expired() {
+	if gaeAppToken == nil || !gaeAppToken.Valid() {
 		token, expiry, err := appengine.AccessToken(a.ctx, identitytoolkitScope)
 		if err != nil {
 			return "", err
 		}
-		gaeAppToken = &oauth.Token{
+		gaeAppToken = &oauth2.Token{
 			AccessToken: token,
 			Expiry:      expiry,
 		}
@@ -61,13 +67,15 @@ func (a *GAEAppAuthenticator) AccessToken(http.RoundTripper) (string, error) {
 
 // NewWithContext creates a Client from the global one and associates it with an
 // appengine.Context, which is required by most appengine APIs.
-func NewWithContext(ctx appengine.Context, client *Client) (*Client, error) {
+func NewWithContext(ctx context.Context, client *Client) (*Client, error) {
 	if _, isGAEAuth := client.authenticator.(*GAEAppAuthenticator); isGAEAuth {
 		return nil, errors.New("global client shouldn't have GAEAppAuthenticator")
 	}
 	newClient := *client
 	if newClient.authenticator == nil {
 		newClient.authenticator = &GAEAppAuthenticator{ctx}
+	} else {
+		newClient.authenticator.SetContext(ctx)
 	}
 	newClient.transport = urlfetch.Client(ctx).Transport
 	return &newClient, nil

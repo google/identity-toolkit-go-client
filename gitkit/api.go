@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"code.google.com/p/google-api-go-client/googleapi"
+	"github.com/google/google-api-go-client/googleapi"
 )
 
 // Bytes is a slice of bytes.
@@ -367,9 +367,6 @@ func (c *APIClient) GetOOBCode(req *GetOOBCodeRequest) (*GetOOBCodeResponse, err
 	case ResetPasswordRequestType:
 		if req.Email == "" {
 			return nil, fmt.Errorf("GetOOBCode: must provide an email")
-		}
-		if req.CAPTCHAChallenge == "" {
-			return nil, fmt.Errorf("GetOOBCode: must provide CAPTCHA challenge")
 		}
 		if req.CAPTCHAResponse == "" {
 			return nil, fmt.Errorf("GetOOBCode: must provide CAPTCHA response")
