@@ -16,6 +16,12 @@
 
 package gitkit
 
+import "golang.org/x/net/context"
+
 func runInGAEProd() bool {
 	return false
+}
+
+func NewWithContext(ctx context.Context, client *Client) (*Client, error) {
+	return client, nil
 }
