@@ -6,7 +6,7 @@ The `gitkit` package provides convenient utilities for websites to integrate wit
 See more at https://developers.google.com/identity-toolkit
 
 To use Identity Toolkit Go client in your own server:
-```
+```go
 var client *gitkit.Client
 
 func handleSignIn(w http.ResponseWriter, r *http.Request) {
@@ -46,7 +46,7 @@ func main() {
 
 The integration is similar with some differences if you want to use the client
 in a Google App Engine app.
-```
+```go
 var client *gitkit.Client
 
 func handleSignIn(w http.ResponseWriter, r *http.Request) {
@@ -100,20 +100,20 @@ The client also provides other methods to help manage user account, for example,
 
 To validate the token and also fetch the account information from identity
 toolkit service:
-```
+```go
 user, err := client.UserByToken(token)
 ```
 or:
-```
+```go
 user, err := client.UserByEmail(email)
 ```
 or:
-```
+```go
 user, err := client.UserByLocalID(localID)
 ```
 
 To update, or delete the account information of a user:
-```
+```go
 err := client.UpdateUser(user)
 err := client.DeleteUser(user)
 ```
