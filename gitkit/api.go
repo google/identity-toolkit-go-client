@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/google-api-go-client/googleapi"
+	"google.golang.org/api/googleapi"
 )
 
 // Bytes is a slice of bytes.
