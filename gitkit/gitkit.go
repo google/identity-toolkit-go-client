@@ -20,7 +20,9 @@ import (
 	"net/http"
 	"net/url"
 
-	"golang.org/x/oauth2/jwt"
+	"golang.org/x/net/context"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 )
 
 const (
@@ -32,19 +34,17 @@ const (
 // Client provides convenient utilities for integrating identitytoolkit service
 // into a web service.
 type Client struct {
-	config    *Config
-	widgetURL *url.URL
-	certs     *Certificates
-
-	authenticator Authenticator
-	transport     http.RoundTripper
+	config           *Config
+	widgetURL        *url.URL
+	certs            *Certificates
+	apiClient        *APIClient
+	defaultTransport http.RoundTripper
 }
 
 // New creates a Client from the configuration.
-func New(config *Config) (*Client, error) {
+func New(ctx context.Context, config *Config) (*Client, error) {
 	conf := *config
-	requireServiceAccountInfo := !runInGAEProd()
-	if err := conf.normalize(requireServiceAccountInfo); err != nil {
+	if err := conf.normalize(); err != nil {
 		return nil, err
 	}
 	certs := &Certificates{URL: publicCertsURL}
@@ -56,40 +56,22 @@ func New(config *Config) (*Client, error) {
 			return nil, fmt.Errorf("invalid WidgetURL: %s", conf.WidgetURL)
 		}
 	}
-	var authenticator Authenticator
-	if conf.ServiceAccount != "" && len(conf.PEMKey) != 0 {
-		authenticator = &PEMKeyAuthenticator{
-			assertion: &jwt.Config{
-				Email:      conf.ServiceAccount,
-				PrivateKey: conf.PEMKey,
-				Scopes:     []string{identitytoolkitScope},
-				TokenURL:   tokenEndpointURL},
-		}
+	ts, err := google.DefaultTokenSource(ctx, identitytoolkitScope)
+	if err != nil {
+		return nil, err
 	}
-	return &Client{
-		config:        &conf,
-		widgetURL:     widgetURL,
-		authenticator: authenticator,
-		certs:         certs,
-	}, nil
-}
-
-func (c *Client) defaultTransport() http.RoundTripper {
-	if c.transport == nil {
-		return http.DefaultTransport
-	}
-	return c.transport
-}
-
-func (c *Client) apiClient() *APIClient {
-	return &APIClient{
+	apiClient := &APIClient{
 		http.Client{
-			Transport: &ServiceAccountTransport{
-				Auth:      c.authenticator,
-				Transport: c.defaultTransport(),
-			},
+			Transport: &transport{oauth2.NewClient(ctx, ts).Transport},
 		},
 	}
+	return &Client{
+		config:           &conf,
+		widgetURL:        widgetURL,
+		certs:            certs,
+		apiClient:        apiClient,
+		defaultTransport: defaultTransport(ctx),
+	}, nil
 }
 
 // TokenFromRequest extracts the ID token from the HTTP request if present.
@@ -106,7 +88,7 @@ func (c *Client) TokenFromRequest(req *http.Request) string {
 // Beside verifying the token is a valid JWT, it also validates that the token
 // is not expired and is issued to the client.
 func (c *Client) ValidateToken(token string) (*Token, error) {
-	if err := c.certs.LoadIfNecessary(c.defaultTransport()); err != nil {
+	if err := c.certs.LoadIfNecessary(c.defaultTransport); err != nil {
 		return nil, err
 	}
 	t, err := VerifyToken(token, c.config.ClientID, nil, c.certs)
@@ -136,7 +118,7 @@ func (c *Client) UserByToken(token string) (*User, error) {
 // UserByEmail retrieves the account information of the user specified by the
 // email address.
 func (c *Client) UserByEmail(email string) (*User, error) {
-	resp, err := c.apiClient().GetAccountInfo(&GetAccountInfoRequest{Emails: []string{email}})
+	resp, err := c.apiClient.GetAccountInfo(&GetAccountInfoRequest{Emails: []string{email}})
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +131,7 @@ func (c *Client) UserByEmail(email string) (*User, error) {
 // UserByLocalID retrieves the account information of the user specified by the
 // local ID.
 func (c *Client) UserByLocalID(localID string) (*User, error) {
-	resp, err := c.apiClient().GetAccountInfo(&GetAccountInfoRequest{LocalIDs: []string{localID}})
+	resp, err := c.apiClient.GetAccountInfo(&GetAccountInfoRequest{LocalIDs: []string{localID}})
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +143,7 @@ func (c *Client) UserByLocalID(localID string) (*User, error) {
 
 // UpdateUser updates the account information of the user.
 func (c *Client) UpdateUser(user *User) error {
-	_, err := c.apiClient().SetAccountInfo(&SetAccountInfoRequest{
+	_, err := c.apiClient.SetAccountInfo(&SetAccountInfoRequest{
 		LocalID:       user.LocalID,
 		Email:         user.Email,
 		DisplayName:   user.DisplayName,
@@ -172,7 +154,7 @@ func (c *Client) UpdateUser(user *User) error {
 
 // DeleteUser deletes a user specified by the local ID.
 func (c *Client) DeleteUser(user *User) error {
-	_, err := c.apiClient().DeleteAccount(&DeleteAccountRequest{LocalID: user.LocalID})
+	_, err := c.apiClient.DeleteAccount(&DeleteAccountRequest{LocalID: user.LocalID})
 	return err
 }
 
@@ -180,7 +162,7 @@ func (c *Client) DeleteUser(user *User) error {
 // algorithm, key, saltSeparator specify the password hash algorithm, signer key
 // and separator between password and salt accordingly.
 func (c *Client) UploadUsers(users []*User, algorithm string, key, saltSeparator []byte) error {
-	resp, err := c.apiClient().UploadAccount(&UploadAccountRequest{users, algorithm, key, saltSeparator})
+	resp, err := c.apiClient.UploadAccount(&UploadAccountRequest{users, algorithm, key, saltSeparator})
 	if err != nil {
 		return err
 	}
@@ -194,7 +176,7 @@ func (c *Client) UploadUsers(users []*User, algorithm string, key, saltSeparator
 // For the first n users, the pageToken should be empty. Upon success, the users
 // and pageToken for next n users are returned.
 func (c *Client) ListUsersN(n int, pageToken string) ([]*User, string, error) {
-	resp, err := c.apiClient().DownloadAccount(&DownloadAccountRequest{n, pageToken})
+	resp, err := c.apiClient.DownloadAccount(&DownloadAccountRequest{n, pageToken})
 	if err != nil {
 		return nil, "", err
 	}
@@ -334,7 +316,7 @@ func (c *Client) GenerateResetPasswordOOBCode(
 		CAPTCHAResponse:  captchaResponse,
 		UserIP:           extractRemoteIP(req),
 	}
-	resp, err := c.apiClient().GetOOBCode(r)
+	resp, err := c.apiClient.GetOOBCode(r)
 	if err != nil {
 		return nil, err
 	}
@@ -359,7 +341,7 @@ func (c *Client) GenerateChangeEmailOOBCode(
 		Token:       token,
 		UserIP:      extractRemoteIP(req),
 	}
-	resp, err := c.apiClient().GetOOBCode(r)
+	resp, err := c.apiClient.GetOOBCode(r)
 	if err != nil {
 		return nil, err
 	}
@@ -382,7 +364,7 @@ func (c *Client) GenerateVerifyEmailOOBCode(req *http.Request, email string) (*O
 		Email:       email,
 		UserIP:      extractRemoteIP(req),
 	}
-	resp, err := c.apiClient().GetOOBCode(r)
+	resp, err := c.apiClient.GetOOBCode(r)
 	if err != nil {
 		return nil, err
 	}
