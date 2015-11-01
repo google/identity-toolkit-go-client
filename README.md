@@ -1,4 +1,8 @@
-This is the Go client library for Google Identity Toolkit services.
+# Google Identity Toolkit Go client
+
+[![Build Status][travisimg]][travis]
+
+This is the Go client library for [Google Identity Toolkit][gitkit] services.
 Documentation at http://godoc.org/github.com/google/identity-toolkit-go-client/gitkit
 
 The `gitkit` package provides convenient utilities for websites to integrate
@@ -117,3 +121,7 @@ To update, or delete the account information of a user:
 err := client.UpdateUser(user)
 err := client.DeleteUser(user)
 ```
+
+[travisimg]: https://api.travis-ci.org/google/identity-toolkit-go-client.svg
+[travis]: https://travis-ci.org/google/identity-toolkit-go-client
+[gitkit]: https://developers.google.com/identity/toolkit/
