@@ -110,15 +110,9 @@ func (c *Client) ValidateToken(token string) (*Token, error) {
 	if err := c.certs.LoadIfNecessary(transport); err != nil {
 		return nil, err
 	}
-	t, err := VerifyToken(token, c.certs)
+	t, err := VerifyToken(token, c.config.ClientID, nil, c.certs)
 	if err != nil {
 		return nil, err
-	}
-	if t.Expired() {
-		return nil, fmt.Errorf("token has expired at: %s", t.ExpireAt)
-	}
-	if t.Audience != c.config.ClientID {
-		return nil, fmt.Errorf("incorrect audience in token: %s", t.Audience)
 	}
 	return t, nil
 }

@@ -18,7 +18,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"strings"
 	"time"
 
@@ -48,6 +48,10 @@ type Token struct {
 	// ProviderID is the identifier for the identity provider (IDP) for the
 	// user. It is usually the top level domain of the IDP, e.g., google.com.
 	ProviderID string
+	// DisplayName is the name that the user wants to be referred to.
+	DisplayName string
+	// PhotoURL is the URL of the user's profile picture.
+	PhotoURL string
 	// The token string.
 	TokenString string
 }
@@ -57,78 +61,106 @@ func (t *Token) Expired() bool {
 	return time.Now().After(t.ExpireAt)
 }
 
+// Errors that can be returned from the VerifyToken function.
+var (
+	ErrMalformed        = errors.New("malfored token")
+	ErrInvalidAlgorithm = errors.New("invalid algorithm")
+	ErrInvalidIssuer    = errors.New("invalid issuer")
+	ErrInvalidAudience  = errors.New("invalid audience")
+	ErrInvalidSignature = errors.New("invalid signature")
+	ErrKeyNotFound      = errors.New("key not found")
+	ErrExpired          = errors.New("token expired")
+)
+
 // VerifyToken verifies the JWT is valid and signed by identitytoolkit service
-// and returns the verfied token.
-func VerifyToken(token string, certs *Certificates) (*Token, error) {
+// and returns the verfied token. A token is valid if and only if it passes the
+// following checks:
+// 1. The value of "iss" field is one of the issuers if issuers is not nil;
+// 2. The value of "aud" field is the same as the audience;
+// 3. The token is not expired according to the "exp" field;
+// 4. The signature can be verified from one of the certs;
+func VerifyToken(token string, audience string, issuers []string, certs *Certificates) (*Token, error) {
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
-		return nil, fmt.Errorf("not a JWT: %s", token)
-	}
-	// Check the header to extract the "kid" field.
-	h, err := decodeSegment(parts[0])
-	if err != nil {
-		return nil, err
-	}
-	hh := struct {
-		KeyID string `json:"kid"`
-	}{}
-	if err = json.Unmarshal(h, &hh); err != nil {
-		return nil, err
-	}
-	cert, err := certs.Cert(hh.KeyID)
-	if err != nil {
-		return nil, err
+		return nil, ErrMalformed
 	}
 	// Check the claim set.
-	c, err := decodeSegment(parts[1])
+	c, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return nil, ErrMalformed
+	}
+	claims := struct {
+		Iss         string `json:"iss,omitempty"`
+		Aud         string `json:"aud,omitempty"`
+		Iat         int64  `json:"iat,omitempty"`
+		Exp         int64  `json:"exp,omitempty"`
+		UserID      string `json:"user_id,omitempty"`
+		Email       string `json:"email,omitempty"`
+		Verified    bool   `json:"verified,omitempty"`
+		ProviderID  string `json:"provider_id,omitempty"`
+		DisplayName string `json:"display_name,omitempty"`
+		PhotoURL    string `json:"photo_url,omitempty"`
+	}{}
+	if err = json.Unmarshal(c, &claims); err != nil {
+		return nil, ErrMalformed
+	}
+	if issuers != nil && !inArray(issuers, claims.Iss) {
+		return nil, ErrInvalidIssuer
+	}
+	if audience != claims.Aud {
+		return nil, ErrInvalidAudience
+	}
+	exp := time.Unix(claims.Exp, 0)
+	if time.Now().After(exp) {
+		return nil, ErrExpired
+	}
+	// Check the header to extract the "kid" field.
+	h, err := base64.RawURLEncoding.DecodeString(parts[0])
 	if err != nil {
 		return nil, err
 	}
-	t := struct {
-		Iss        string `json:"iss,omitempty"`
-		Aud        string `json:"aud,omitempty"`
-		Iat        int64  `json:"iat,omitempty"`
-		Exp        int64  `json:"exp,omitempty"`
-		UserID     string `json:"user_id,omitempty"`
-		Email      string `json:"email,omitempty"`
-		Verified   bool   `json:"verified,omitempty"`
-		ProviderID string `json:"providerId,omitempty"`
+	header := struct {
+		Algorithm string `json:"alg,omitempty"`
+		KeyID     string `json:"kid,omitempty"`
 	}{}
-	if err = json.Unmarshal(c, &t); err != nil {
-		return nil, err
+	if err = json.Unmarshal(h, &header); err != nil {
+		return nil, ErrMalformed
 	}
-	if t.Iss == "" || t.Aud == "" || t.Iat == 0 || t.Exp == 0 || t.UserID == "" {
-		return nil, fmt.Errorf("missing required fields: %v", t)
+	if header.Algorithm != "RS256" {
+		return nil, ErrInvalidAlgorithm
+	}
+	cert, err := certs.Cert(header.KeyID)
+	if err != nil {
+		return nil, ErrKeyNotFound
 	}
 	// Check the signature.
-	s, err := decodeSegment(parts[2])
+	signature, err := base64.RawURLEncoding.DecodeString(parts[2])
 	if err != nil {
-		return nil, err
+		return nil, ErrMalformed
 	}
-	if err := cert.CheckSignature(x509.SHA256WithRSA, []byte(parts[0]+"."+parts[1]), s); err != nil {
-		return nil, err
+	if err := cert.CheckSignature(x509.SHA256WithRSA, []byte(parts[0]+"."+parts[1]), signature); err != nil {
+		return nil, ErrInvalidSignature
 	}
 	return &Token{
-		Issuer:        t.Iss,
-		Audience:      t.Aud,
-		IssueAt:       time.Unix(t.Iat, 0),
-		ExpireAt:      time.Unix(t.Exp, 0),
-		LocalID:       t.UserID,
-		Email:         t.Email,
-		EmailVerified: t.Verified,
-		ProviderID:    t.ProviderID,
+		Issuer:        claims.Iss,
+		Audience:      claims.Aud,
+		IssueAt:       time.Unix(claims.Iat, 0),
+		ExpireAt:      time.Unix(claims.Exp, 0),
+		LocalID:       claims.UserID,
+		Email:         claims.Email,
+		EmailVerified: claims.Verified,
+		ProviderID:    claims.ProviderID,
+		DisplayName:   claims.DisplayName,
+		PhotoURL:      claims.PhotoURL,
 		TokenString:   token,
 	}, nil
 }
 
-// decodeSegment decodes the Base64 encoding segment of the JWT token.
-// It pads the string if necessary.
-func decodeSegment(s string) ([]byte, error) {
-	switch len(s) % 4 {
-	case 2:
-		s = s + "=="
-	case 3:
-		s = s + "="
+func inArray(a []string, e string) bool {
+	for _, v := range a {
+		if v == e {
+			return true
+		}
 	}
-	return base64.URLEncoding.DecodeString(s)
+	return false
 }
