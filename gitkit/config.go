@@ -35,9 +35,6 @@ type Config struct {
 	WidgetModeParamName string `json:"widgetModeParamName,omitempty"`
 	// CookieName is the name of the cookie that stores the ID token.
 	CookieName string `json:"cookieName,omitempty"`
-	// ServerAPIKey is the API key for the server to fetch the identitytoolkit
-	// public certificates.
-	ServerAPIKey string `json:"serverApiKey,omitempty"`
 	// ServiceAccount is the Google OAuth2 service account email address.
 	ServiceAccount string `json:"serviceAccountEmail,omitempty"`
 	// PEMKeyPath is the path of the PEM enconding private key file for the
@@ -80,9 +77,6 @@ func (conf *Config) normalize(requireServiceAccountInfo bool) error {
 	}
 	if conf.CookieName == "" {
 		conf.CookieName = defaultCookieName
-	}
-	if conf.ServerAPIKey == "" {
-		return errors.New("missing ServerAPIKey in config")
 	}
 	if len(conf.PEMKey) == 0 && conf.PEMKeyPath != "" {
 		key, err := ioutil.ReadFile(conf.PEMKeyPath)

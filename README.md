@@ -28,7 +28,6 @@ func main() {
 	config := &gitkit.Config{
 		ClientID: "123.apps.googleusercontent.com",
 		WidgetURL: "http://localhost/gitkit",
-		ServerAPIKey: "server_api_key",
 		ServiceAccount: "123-abc@developer.gserviceaccount.com",
 		PEMKeyPath: "/path/to/service_account/private-key.pem",
 	}
@@ -78,7 +77,6 @@ func init() {
 	config := &gitkit.Config{
 		ClientID: "123.apps.googleusercontent.com",
 		WidgetURL: "http://localhost/gitkit",
-		ServerAPIKey: "server_api_key",
 	}
 	// Service account and private key are not required in Google App Engine
 	// Prod environment. GAE App Identity API is used to identify the app.
