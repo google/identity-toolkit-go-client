@@ -85,7 +85,7 @@ func VerifyToken(token string, audience string, issuers []string, certs *Certifi
 		return nil, ErrMalformed
 	}
 	// Check the claim set.
-	c, err := base64.RawURLEncoding.DecodeString(parts[1])
+	c, err := decodeSegment(parts[1])
 	if err != nil {
 		return nil, ErrMalformed
 	}
@@ -115,7 +115,7 @@ func VerifyToken(token string, audience string, issuers []string, certs *Certifi
 		return nil, ErrExpired
 	}
 	// Check the header to extract the "kid" field.
-	h, err := base64.RawURLEncoding.DecodeString(parts[0])
+	h, err := decodeSegment(parts[0])
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +134,7 @@ func VerifyToken(token string, audience string, issuers []string, certs *Certifi
 		return nil, ErrKeyNotFound
 	}
 	// Check the signature.
-	signature, err := base64.RawURLEncoding.DecodeString(parts[2])
+	signature, err := decodeSegment(parts[2])
 	if err != nil {
 		return nil, ErrMalformed
 	}
@@ -163,4 +163,16 @@ func inArray(a []string, e string) bool {
 		}
 	}
 	return false
+}
+
+// decodeSegment decodes the Base64 encoding segment of the JWT token.
+// It pads the string if necessary.
+func decodeSegment(s string) ([]byte, error) {
+	switch len(s) % 4 {
+	case 2:
+		s = s + "=="
+	case 3:
+		s = s + "="
+	}
+	return base64.URLEncoding.DecodeString(s)
 }
