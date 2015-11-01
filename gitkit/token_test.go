@@ -15,6 +15,7 @@
 package gitkit
 
 import (
+	"bytes"
 	"crypto/x509"
 	"encoding/pem"
 	"reflect"
@@ -213,6 +214,28 @@ func TestVerifyToken(t *testing.T) {
 		}
 		if !reflect.DeepEqual(tt.token, token) {
 			t.Errorf("[%d]%s: expected token=%v, but got %v", i, tt.name, tt.token, token)
+		}
+	}
+}
+
+func TestDecodeSegment(t *testing.T) {
+	segTests := []struct {
+		encoded string
+		decoded []byte
+	}{
+		{"bm9wYWRkaW5n", []byte("nopadding")},
+		{"cGFkZGluZzE", []byte("padding1")},
+		{"cGFkZGluZzE=", []byte("padding1")},
+		{"cGFkZGluZ3R3bw", []byte("paddingtwo")},
+		{"cGFkZGluZ3R3bw==", []byte("paddingtwo")},
+	}
+	for i, st := range segTests {
+		s, err := decodeSegment(st.encoded)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(s, st.decoded) {
+			t.Errorf("%d. expected decodeSegment(%q) = %v, but got %v", i, st.encoded, st.decoded, s)
 		}
 	}
 }
