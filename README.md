@@ -1,7 +1,8 @@
 This is the Go client library for Google Identity Toolkit services.
 Documentation at http://godoc.org/github.com/google/identity-toolkit-go-client/gitkit
 
-The `gitkit` package provides convenient utilities for websites to integrate with Google Identity Toolkit service.
+The `gitkit` package provides convenient utilities for websites to integrate
+with the Google Identity Toolkit service.
 
 See more at https://developers.google.com/identity-toolkit
 
@@ -16,7 +17,7 @@ func handleSignIn(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// Not a valid token. Handle error.
 	}
-	// Token is validate and it contains the user account information
+	// Token is valid and it contains the user account information
 	// including user ID, email address, etc.
 	// Issue your own session cookie to finish the sign in.
 }
@@ -49,7 +50,7 @@ in a Google App Engine app.
 var client *gitkit.Client
 
 func handleSignIn(w http.ResponseWriter, r *http.Request) {
-	// If there is no valid session, check identity tookit ID token.
+	// If there is no valid session, check identity toolkit ID token.
 	// gitkit.NewWithContext needs to be called with the appengine.Context
 	// such that the new client is associated with it since most App Engine
 	// APIs require a context.
@@ -65,7 +66,7 @@ func handleSignIn(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// Not a valid token. Handle error.
 	}
-	// Token is validate and it contains the user account information
+	// Token is valid and it contains the user account information
 	// including user ID, email address, etc.
 	// Issue your own session cookie to finish the sign in.
 }
@@ -94,10 +95,11 @@ func init() {
 }
 ```
 
-The client also provides other methods to help manage user account, for example,
+The client also provides other methods to help manage user accounts, for
+example,
 
-To validate the token and also fetch the account information from identity
-toolkit service:
+To validate the token and also fetch the account information from the
+identity toolkit service:
 ```go
 user, err := client.UserByToken(token)
 ```
