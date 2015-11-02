@@ -1,4 +1,8 @@
-This is the Go client library for Google Identity Toolkit services.
+# Google Identity Toolkit Go client
+
+[![Build Status][travisimg]][travis]
+
+This is the Go client library for [Google Identity Toolkit][gitkit] services.
 Documentation at http://godoc.org/github.com/google/identity-toolkit-go-client/gitkit
 
 The `gitkit` package provides convenient utilities for websites to integrate
@@ -28,7 +32,6 @@ func main() {
 	config := &gitkit.Config{
 		ClientID: "123.apps.googleusercontent.com",
 		WidgetURL: "http://localhost/gitkit",
-		ServerAPIKey: "server_api_key",
 		ServiceAccount: "123-abc@developer.gserviceaccount.com",
 		PEMKeyPath: "/path/to/service_account/private-key.pem",
 	}
@@ -78,7 +81,6 @@ func init() {
 	config := &gitkit.Config{
 		ClientID: "123.apps.googleusercontent.com",
 		WidgetURL: "http://localhost/gitkit",
-		ServerAPIKey: "server_api_key",
 	}
 	// Service account and private key are not required in Google App Engine
 	// Prod environment. GAE App Identity API is used to identify the app.
@@ -119,3 +121,7 @@ To update, or delete the account information of a user:
 err := client.UpdateUser(user)
 err := client.DeleteUser(user)
 ```
+
+[travisimg]: https://api.travis-ci.org/google/identity-toolkit-go-client.svg
+[travis]: https://travis-ci.org/google/identity-toolkit-go-client
+[gitkit]: https://developers.google.com/identity/toolkit/

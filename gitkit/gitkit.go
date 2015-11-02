@@ -106,8 +106,7 @@ func (c *Client) TokenFromRequest(req *http.Request) string {
 // Beside verifying the token is a valid JWT, it also validates that the token
 // is not expired and is issued to the client.
 func (c *Client) ValidateToken(token string) (*Token, error) {
-	transport := &APIKeyTransport{c.config.ServerAPIKey, c.defaultTransport()}
-	if err := c.certs.LoadIfNecessary(transport); err != nil {
+	if err := c.certs.LoadIfNecessary(c.defaultTransport()); err != nil {
 		return nil, err
 	}
 	t, err := VerifyToken(token, c.config.ClientID, nil, c.certs)
