@@ -92,28 +92,3 @@ func (t *ServiceAccountTransport) RoundTrip(req *http.Request) (*http.Response, 
 	newReq.Header.Set("User-Agent", clientUserAgent)
 	return t.Transport.RoundTrip(&newReq)
 }
-
-// APIKeyTransport is an implementation of http.RoundTripper that appends the
-// API key to the request to identitytoolkit APIs that don't require
-// authentication.
-type APIKeyTransport struct {
-	APIKey    string
-	Transport http.RoundTripper // Underlying HTTP transport.
-}
-
-// RoundTrip implements the http.RoundTripper interface.
-func (t *APIKeyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	// Copy the request to avoid modifying the original request.
-	// This is required by the specification of http.RoundTripper.
-	newReq := *req
-	newReq.Header = make(http.Header)
-	for k, v := range req.Header {
-		newReq.Header[k] = v
-	}
-	// Append API key.
-	q := newReq.URL.Query()
-	q.Set("key", t.APIKey)
-	newReq.URL.RawQuery = q.Encode()
-	newReq.Header.Set("User-Agent", clientUserAgent)
-	return t.Transport.RoundTrip(&newReq)
-}
