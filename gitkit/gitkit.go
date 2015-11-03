@@ -16,12 +16,12 @@ package gitkit
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
 
 	"golang.org/x/net/context"
-	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
 
@@ -56,13 +56,27 @@ func New(ctx context.Context, config *Config) (*Client, error) {
 			return nil, fmt.Errorf("invalid WidgetURL: %s", conf.WidgetURL)
 		}
 	}
-	ts, err := google.DefaultTokenSource(ctx, identitytoolkitScope)
-	if err != nil {
-		return nil, err
+	var hc *http.Client
+	if config.GoogleAppCredentialsPath != "" {
+		b, err := ioutil.ReadFile(config.GoogleAppCredentialsPath)
+		if err != nil {
+			return nil, fmt.Errorf("invalid GoogleAppCredentialsPath: %v", err)
+		}
+		jc, err := google.JWTConfigFromJSON(b, identitytoolkitScope)
+		if err != nil {
+			return nil, err
+		}
+		hc = jc.Client(ctx)
+	} else {
+		var err error
+		hc, err = google.DefaultClient(ctx, identitytoolkitScope)
+		if err != nil {
+			return nil, err
+		}
 	}
 	apiClient := &APIClient{
 		http.Client{
-			Transport: &transport{oauth2.NewClient(ctx, ts).Transport},
+			Transport: &transport{hc.Transport},
 		},
 	}
 	return &Client{

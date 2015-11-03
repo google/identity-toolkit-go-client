@@ -35,6 +35,12 @@ type Config struct {
 	WidgetModeParamName string `json:"widgetModeParamName,omitempty"`
 	// CookieName is the name of the cookie that stores the ID token.
 	CookieName string `json:"cookieName,omitempty"`
+	// GoogleAppCredentialsPath is the path of the service account JSON key file
+	// downloaded from Google cloud console.
+	// Only specify it if you cannot use Google Application Default Credentials.
+	// See https://developers.google.com/identity/protocols/application-default-credentials
+	// for more details about Application Default Credentials.
+	GoogleAppCredentialsPath string `json:"googleAppCredentialsPath",omitempty"`
 }
 
 // LoadConfig loads the configuration from the config file specified by path.
