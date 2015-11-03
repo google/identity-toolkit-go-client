@@ -16,10 +16,13 @@ package gitkit
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
 
+	"golang.org/x/net/context"
+	"golang.org/x/oauth2/google"
 	"golang.org/x/oauth2/jwt"
 )
 
@@ -35,16 +38,14 @@ type Client struct {
 	config    *Config
 	widgetURL *url.URL
 	certs     *Certificates
-
-	authenticator Authenticator
-	transport     http.RoundTripper
+	api       *APIClient // Don't use this field directly. Use apiClient() instead.
+	jc        *jwt.Config
 }
 
 // New creates a Client from the configuration.
-func New(config *Config) (*Client, error) {
+func New(ctx context.Context, config *Config) (*Client, error) {
 	conf := *config
-	requireServiceAccountInfo := !runInGAEProd()
-	if err := conf.normalize(requireServiceAccountInfo); err != nil {
+	if err := conf.normalize(); err != nil {
 		return nil, err
 	}
 	certs := &Certificates{URL: publicCertsURL}
@@ -56,40 +57,46 @@ func New(config *Config) (*Client, error) {
 			return nil, fmt.Errorf("invalid WidgetURL: %s", conf.WidgetURL)
 		}
 	}
-	var authenticator Authenticator
-	if conf.ServiceAccount != "" && len(conf.PEMKey) != 0 {
-		authenticator = &PEMKeyAuthenticator{
-			assertion: &jwt.Config{
-				Email:      conf.ServiceAccount,
-				PrivateKey: conf.PEMKey,
-				Scopes:     []string{identitytoolkitScope},
-				TokenURL:   tokenEndpointURL},
+	var jc *jwt.Config
+	if config.GoogleAppCredentialsPath != "" {
+		b, err := ioutil.ReadFile(config.GoogleAppCredentialsPath)
+		if err != nil {
+			return nil, fmt.Errorf("invalid GoogleAppCredentialsPath: %v", err)
+		}
+		jc, err = google.JWTConfigFromJSON(b, identitytoolkitScope)
+		if err != nil {
+			return nil, err
 		}
 	}
+	api, err := newAPIClient(ctx, jc)
+	if err != nil {
+		return nil, err
+	}
 	return &Client{
-		config:        &conf,
-		widgetURL:     widgetURL,
-		authenticator: authenticator,
-		certs:         certs,
+		config:    &conf,
+		widgetURL: widgetURL,
+		certs:     certs,
+		api:       api,
+		jc:        jc,
 	}, nil
 }
 
-func (c *Client) defaultTransport() http.RoundTripper {
-	if c.transport == nil {
-		return http.DefaultTransport
+func newAPIClient(ctx context.Context, jc *jwt.Config) (*APIClient, error) {
+	var hc *http.Client
+	if jc != nil {
+		hc = jc.Client(ctx)
+	} else {
+		var err error
+		hc, err = google.DefaultClient(ctx, identitytoolkitScope)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return c.transport
-}
-
-func (c *Client) apiClient() *APIClient {
 	return &APIClient{
 		http.Client{
-			Transport: &ServiceAccountTransport{
-				Auth:      c.authenticator,
-				Transport: c.defaultTransport(),
-			},
+			Transport: &transport{hc.Transport},
 		},
-	}
+	}, nil
 }
 
 // TokenFromRequest extracts the ID token from the HTTP request if present.
@@ -105,8 +112,8 @@ func (c *Client) TokenFromRequest(req *http.Request) string {
 //
 // Beside verifying the token is a valid JWT, it also validates that the token
 // is not expired and is issued to the client.
-func (c *Client) ValidateToken(token string) (*Token, error) {
-	if err := c.certs.LoadIfNecessary(c.defaultTransport()); err != nil {
+func (c *Client) ValidateToken(ctx context.Context, token string) (*Token, error) {
+	if err := c.certs.LoadIfNecessary(defaultTransport(ctx)); err != nil {
 		return nil, err
 	}
 	t, err := VerifyToken(token, c.config.ClientID, nil, c.certs)
@@ -118,14 +125,14 @@ func (c *Client) ValidateToken(token string) (*Token, error) {
 
 // UserByToken retrieves the account information of the user specified by the ID
 // token.
-func (c *Client) UserByToken(token string) (*User, error) {
-	t, err := c.ValidateToken(token)
+func (c *Client) UserByToken(ctx context.Context, token string) (*User, error) {
+	t, err := c.ValidateToken(ctx, token)
 	if err != nil {
 		return nil, err
 	}
 	localID := t.LocalID
 	providerID := t.ProviderID
-	u, err := c.UserByLocalID(localID)
+	u, err := c.UserByLocalID(ctx, localID)
 	if err != nil {
 		return nil, err
 	}
@@ -135,8 +142,8 @@ func (c *Client) UserByToken(token string) (*User, error) {
 
 // UserByEmail retrieves the account information of the user specified by the
 // email address.
-func (c *Client) UserByEmail(email string) (*User, error) {
-	resp, err := c.apiClient().GetAccountInfo(&GetAccountInfoRequest{Emails: []string{email}})
+func (c *Client) UserByEmail(ctx context.Context, email string) (*User, error) {
+	resp, err := c.apiClient(ctx).GetAccountInfo(&GetAccountInfoRequest{Emails: []string{email}})
 	if err != nil {
 		return nil, err
 	}
@@ -148,8 +155,8 @@ func (c *Client) UserByEmail(email string) (*User, error) {
 
 // UserByLocalID retrieves the account information of the user specified by the
 // local ID.
-func (c *Client) UserByLocalID(localID string) (*User, error) {
-	resp, err := c.apiClient().GetAccountInfo(&GetAccountInfoRequest{LocalIDs: []string{localID}})
+func (c *Client) UserByLocalID(ctx context.Context, localID string) (*User, error) {
+	resp, err := c.apiClient(ctx).GetAccountInfo(&GetAccountInfoRequest{LocalIDs: []string{localID}})
 	if err != nil {
 		return nil, err
 	}
@@ -160,8 +167,8 @@ func (c *Client) UserByLocalID(localID string) (*User, error) {
 }
 
 // UpdateUser updates the account information of the user.
-func (c *Client) UpdateUser(user *User) error {
-	_, err := c.apiClient().SetAccountInfo(&SetAccountInfoRequest{
+func (c *Client) UpdateUser(ctx context.Context, user *User) error {
+	_, err := c.apiClient(ctx).SetAccountInfo(&SetAccountInfoRequest{
 		LocalID:       user.LocalID,
 		Email:         user.Email,
 		DisplayName:   user.DisplayName,
@@ -171,16 +178,16 @@ func (c *Client) UpdateUser(user *User) error {
 }
 
 // DeleteUser deletes a user specified by the local ID.
-func (c *Client) DeleteUser(user *User) error {
-	_, err := c.apiClient().DeleteAccount(&DeleteAccountRequest{LocalID: user.LocalID})
+func (c *Client) DeleteUser(ctx context.Context, user *User) error {
+	_, err := c.apiClient(ctx).DeleteAccount(&DeleteAccountRequest{LocalID: user.LocalID})
 	return err
 }
 
 // UploadUsers uploads the users to identitytoolkit service.
 // algorithm, key, saltSeparator specify the password hash algorithm, signer key
 // and separator between password and salt accordingly.
-func (c *Client) UploadUsers(users []*User, algorithm string, key, saltSeparator []byte) error {
-	resp, err := c.apiClient().UploadAccount(&UploadAccountRequest{users, algorithm, key, saltSeparator})
+func (c *Client) UploadUsers(ctx context.Context, users []*User, algorithm string, key, saltSeparator []byte) error {
+	resp, err := c.apiClient(ctx).UploadAccount(&UploadAccountRequest{users, algorithm, key, saltSeparator})
 	if err != nil {
 		return err
 	}
@@ -193,8 +200,8 @@ func (c *Client) UploadUsers(users []*User, algorithm string, key, saltSeparator
 // ListUsersN lists the next n users.
 // For the first n users, the pageToken should be empty. Upon success, the users
 // and pageToken for next n users are returned.
-func (c *Client) ListUsersN(n int, pageToken string) ([]*User, string, error) {
-	resp, err := c.apiClient().DownloadAccount(&DownloadAccountRequest{n, pageToken})
+func (c *Client) ListUsersN(ctx context.Context, n int, pageToken string) ([]*User, string, error) {
+	resp, err := c.apiClient(ctx).DownloadAccount(&DownloadAccountRequest{n, pageToken})
 	if err != nil {
 		return nil, "", err
 	}
@@ -212,12 +219,12 @@ type UserList struct {
 	pageToken string
 }
 
-func (l *UserList) start() {
+func (l *UserList) start(ctx context.Context) {
 	ch := make(chan *User, maxResultsPerPage)
 	l.C = ch
 	go func() {
 		for {
-			users, pageToken, err := l.client.ListUsersN(maxResultsPerPage, l.pageToken)
+			users, pageToken, err := l.client.ListUsersN(ctx, maxResultsPerPage, l.pageToken)
 			if err != nil {
 				l.Error = err
 				close(ch)
@@ -236,10 +243,10 @@ func (l *UserList) start() {
 }
 
 // Retry resets Error to nil and resumes the downloading.
-func (l *UserList) Retry() {
+func (l *UserList) Retry(ctx context.Context) {
 	if l.Error != nil {
 		l.Error = nil
-		l.start()
+		l.start(ctx)
 	}
 }
 
@@ -257,9 +264,9 @@ func (l *UserList) Retry() {
 //			break
 //		}
 //	}
-func (c *Client) ListUsers() *UserList {
+func (c *Client) ListUsers(ctx context.Context) *UserList {
 	l := &UserList{client: c}
-	l.start()
+	l.start(ctx)
 	return l
 }
 
@@ -300,22 +307,24 @@ type OOBCodeResponse struct {
 }
 
 // GenerateOOBCode generates an OOB code based on the request.
-func (c *Client) GenerateOOBCode(req *http.Request) (*OOBCodeResponse, error) {
+func (c *Client) GenerateOOBCode(ctx context.Context, req *http.Request) (*OOBCodeResponse, error) {
 	switch action := req.PostFormValue(OOBActionParam); action {
 	case OOBActionResetPassword:
 		return c.GenerateResetPasswordOOBCode(
+			ctx,
 			req,
 			req.PostFormValue(OOBEmailParam),
 			req.PostFormValue(OOBCAPTCHAChallengeParam),
 			req.PostFormValue(OOBCAPTCHAResponseParam))
 	case OOBActionChangeEmail:
 		return c.GenerateChangeEmailOOBCode(
+			ctx,
 			req,
 			req.PostFormValue(OOBOldEmailParam),
 			req.PostFormValue(OOBNewEmailParam),
 			c.TokenFromRequest(req))
 	case OOBActionVerifyEmail:
-		return c.GenerateVerifyEmailOOBCode(req, req.PostFormValue(OOBEmailParam))
+		return c.GenerateVerifyEmailOOBCode(ctx, req, req.PostFormValue(OOBEmailParam))
 	default:
 		return nil, fmt.Errorf("unrecognized action: %s", action)
 	}
@@ -326,7 +335,7 @@ func (c *Client) GenerateOOBCode(req *http.Request) (*OOBCodeResponse, error) {
 // If WidgetURL is not provided in the configuration, the OOBCodeURL field in
 // the returned OOBCodeResponse is nil.
 func (c *Client) GenerateResetPasswordOOBCode(
-	req *http.Request, email, captchaChallenge, captchaResponse string) (*OOBCodeResponse, error) {
+	ctx context.Context, req *http.Request, email, captchaChallenge, captchaResponse string) (*OOBCodeResponse, error) {
 	r := &GetOOBCodeRequest{
 		RequestType:      ResetPasswordRequestType,
 		Email:            email,
@@ -334,7 +343,7 @@ func (c *Client) GenerateResetPasswordOOBCode(
 		CAPTCHAResponse:  captchaResponse,
 		UserIP:           extractRemoteIP(req),
 	}
-	resp, err := c.apiClient().GetOOBCode(r)
+	resp, err := c.apiClient(ctx).GetOOBCode(r)
 	if err != nil {
 		return nil, err
 	}
@@ -351,7 +360,7 @@ func (c *Client) GenerateResetPasswordOOBCode(
 // If WidgetURL is not provided in the configuration, the OOBCodeURL field in
 // the returned OOBCodeResponse is nil.
 func (c *Client) GenerateChangeEmailOOBCode(
-	req *http.Request, email, newEmail, token string) (*OOBCodeResponse, error) {
+	ctx context.Context, req *http.Request, email, newEmail, token string) (*OOBCodeResponse, error) {
 	r := &GetOOBCodeRequest{
 		RequestType: ChangeEmailRequestType,
 		Email:       email,
@@ -359,7 +368,7 @@ func (c *Client) GenerateChangeEmailOOBCode(
 		Token:       token,
 		UserIP:      extractRemoteIP(req),
 	}
-	resp, err := c.apiClient().GetOOBCode(r)
+	resp, err := c.apiClient(ctx).GetOOBCode(r)
 	if err != nil {
 		return nil, err
 	}
@@ -376,13 +385,14 @@ func (c *Client) GenerateChangeEmailOOBCode(
 //
 // If WidgetURL is not provided in the configuration, the OOBCodeURL field in
 // the returned OOBCodeResponse is nil.
-func (c *Client) GenerateVerifyEmailOOBCode(req *http.Request, email string) (*OOBCodeResponse, error) {
+func (c *Client) GenerateVerifyEmailOOBCode(
+	ctx context.Context, req *http.Request, email string) (*OOBCodeResponse, error) {
 	r := &GetOOBCodeRequest{
 		RequestType: VerifyEmailRequestType,
 		Email:       email,
 		UserIP:      extractRemoteIP(req),
 	}
-	resp, err := c.apiClient().GetOOBCode(r)
+	resp, err := c.apiClient(ctx).GetOOBCode(r)
 	if err != nil {
 		return nil, err
 	}

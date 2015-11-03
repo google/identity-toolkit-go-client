@@ -18,14 +18,14 @@ integrate Google Identity Toolkit.
 
 See more at https://developers.google.com/identity-toolkit
 
-To use Identity Toolkit Go client in your own server:
+To use Identity Toolkit Go client:
 
 	var client *gitkit.Client
 
 	func handleSignIn(w http.ResponseWriter, r *http.Request) {
 		// If there is no valid session, check identity tookit ID token.
 		ts := client.TokenFromRequest(r)
-		token, err := client.ValidateToken(ts)
+		token, err := client.ValidateToken(context.Background(), ts)
 		if err != nil {
 			// Not a valid token. Handle error.
 		}
@@ -38,13 +38,12 @@ To use Identity Toolkit Go client in your own server:
 		// Provide configuration. gitkit.LoadConfig() can also be used to load
 		// the configuration from a JSON file.
 		config := &gitkit.Config{
-			ClientID: "123.apps.googleusercontent.com",
-			WidgetURL: "http://localhost/gitkit",
-			ServiceAccount: "123-abc@developer.gserviceaccount.com",
-			PEMKeyPath: "/path/to/service_account/private-key.pem",
+			ClientID:	"123.apps.googleusercontent.com",
+			WidgetURL:	"http://localhost/gitkit",
+			CookieName:	"gtoken",
 		}
 		var err error
-		client, err = gitkit.New(config)
+		client, err = gitkit.New(context.Background(), config)
 		if err != nil {
 			// Handle error.
 		}
@@ -55,25 +54,15 @@ To use Identity Toolkit Go client in your own server:
 		log.Fatal(http.ListenAndServe(":8080", nil))
 	}
 
-The integration is similar with some differences if you want to use the client
-in a Google App Engine app.
+The integration with Google App Engine is similar except for the context
+variable should be created from the request, i.e., appengine.NewContext(r):
 
 	var client *gitkit.Client
 
 	func handleSignIn(w http.ResponseWriter, r *http.Request) {
 		// If there is no valid session, check identity tookit ID token.
-		// gitkit.NewWithContext needs to be called with the appengine.Context
-		// such that the new client is associated with it since most App Engine
-		// APIs require a context.
-		ctx := appengine.NewContext(r)
-		c, err := gitkit.NewWithContext(ctx, client)
-		if err != nil {
-			// Handle error.
-		}
-
-		// Validate the token in the same way.
-		ts := c.TokenFromRequest(r)
-		token, err := c.ValidateToken(ts)
+		ts := client.TokenFromRequest(r)
+		token, err := client.ValidateToken(appengine.NewContext(r), ts)
 		if err != nil {
 			// Not a valid token. Handle error.
 		}
@@ -86,23 +75,55 @@ in a Google App Engine app.
 		// Provide configuration. gitkit.LoadConfig() can also be used to load
 		// the configuration from a JSON file.
 		config := &gitkit.Config{
-			ClientID: "123.apps.googleusercontent.com",
-			WidgetURL: "http://localhost/gitkit",
+			ClientID:	"123.apps.googleusercontent.com",
+			WidgetURL:	"http://localhost/gitkit",
+			CookieName:	"gtoken",
 		}
-		// Service account and private key are not required in Google App Engine
-		// Prod environment. GAE App Identity API is used to identify the app.
+		// Set the JSON key file path if running dev server in local.
 		if appengine.IsDevAppServer() {
-			config.ServiceAccount = "123-abc@developer.gserviceaccount.com"
-			config.PEMKeyPath = "/path/to/service_account/private-key.pem"
+			c.GoogleAppCredentialsPath = googleAppCredentialsPath
 		}
 		var err error
-		client, err = gitkit.New(config)
+		client, err = gitkit.New(context.Background(), config)
 		if err != nil {
 			// Handle error.
 		}
 
-		// Provide HTTP handler
+		// Provide HTTP handler.
 		http.HandleFunc("/signIn", handleSignIn)
+		// Start the server.
+		log.Fatal(http.ListenAndServe(":8080", nil))
 	}
+
+The Go client uses Google Application Default Credentials to access
+authentication required Identity Toolkit API. The credentials returned are
+determined by the environment the code is running in. Conditions are checked in
+the following order:
+
+1. The environment variable GOOGLE_APPLICATION_CREDENTIALS is checked. If this
+variable is specified it should point to a file that defines the credentials.
+The simplest way to get a credential for this purpose is to create a service
+account using the Google Developers Console in the section APIs & Auth, in the
+sub-section Credentials. Create a service account or choose an existing one and
+select Generate new JSON key. Set the environment variable to the path of the
+JSON file downloaded.
+
+2. If you have installed the Google Cloud SDK on your machine and have run the
+command gcloud auth login, your identity can be used as a proxy to test code
+calling APIs from that machine.
+
+3. If you are running in Google App Engine production, the built-in service
+account associated with the application will be used.
+
+4. If you are running in Google Compute Engine production, the built-in
+service account associated with the virtual machine instance will be used.
+
+5. If none of these conditions is true, an error will occur.
+
+See more about Google Application Default Credentials at
+https://developers.google.com/identity/protocols/application-default-credentials
+
+If Application Default Credentials doesn't work for your use case, you can
+set GoogleAppCredentialsPath in the config to the JSON key file path.
 */
 package gitkit
