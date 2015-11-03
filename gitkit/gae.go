@@ -25,7 +25,6 @@ import (
 )
 
 // defaultTransport returns a urlfetcher HTTP transport in AppEngine.
-func defaultTransport(ctx context.Context, b bool) http.RoundTripper {
-	_ = b
+func defaultTransport(ctx context.Context) http.RoundTripper {
 	return urlfetch.Client(ctx).Transport
 }
