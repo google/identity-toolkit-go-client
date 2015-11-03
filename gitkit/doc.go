@@ -107,19 +107,23 @@ account using the Google Developers Console in the section APIs & Auth, in the
 sub-section Credentials. Create a service account or choose an existing one and
 select Generate new JSON key. Set the environment variable to the path of the
 JSON file downloaded.
+
 2. If you have installed the Google Cloud SDK on your machine and have run the
 command gcloud auth login, your identity can be used as a proxy to test code
 calling APIs from that machine.
+
 3. If you are running in Google App Engine production, the built-in service
 account associated with the application will be used.
+
 4. If you are running in Google Compute Engine production, the built-in
 service account associated with the virtual machine instance will be used.
+
 5. If none of these conditions is true, an error will occur.
 
 See more about Google Application Default Credentials at
 https://developers.google.com/identity/protocols/application-default-credentials
 
 If Application Default Credentials doesn't work for your use case, you can
-set `GoogleAppCredentialsPath` in the config to the JSON key file path.
+set GoogleAppCredentialsPath in the config to the JSON key file path.
 */
 package gitkit

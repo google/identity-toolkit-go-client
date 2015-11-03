@@ -48,7 +48,7 @@ func main() {
 ```
 
 The integration with Google App Engine is similar except for the context
-variable should be created from the request, i.e., appengine.NewContext(r):
+variable should be created from the request, i.e., `appengine.NewContext(r)`:
 ```go
 var client *gitkit.Client
 
