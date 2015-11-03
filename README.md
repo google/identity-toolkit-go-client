@@ -17,7 +17,7 @@ var client *gitkit.Client
 func handleSignIn(w http.ResponseWriter, r *http.Request) {
 	// If there is no valid session, check identity tookit ID token.
 	ts := client.TokenFromRequest(r)
-	token, err := client.ValidateToken(ts)
+	token, err := client.ValidateToken(context.Background(), ts)
 	if err != nil {
 		// Not a valid token. Handle error.
 	}
@@ -35,7 +35,7 @@ func main() {
 		CookieName: "gtoken",
 	}
 	var err error
-	client, err = gitkit.New(context.TODO(), config)
+	client, err = gitkit.New(context.Background(), config)
 	if err != nil {
 		// Handle error.
 	}
