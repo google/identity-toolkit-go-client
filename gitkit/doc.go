@@ -79,6 +79,10 @@ variable should be created from the request, i.e., appengine.NewContext(r):
 			WidgetURL:	"http://localhost/gitkit",
 			CookieName:	"gtoken",
 		}
+		// Set the JSON key file path if running dev server in local.
+		if appengine.IsDevAppServer() {
+			c.GoogleAppCredentialsPath = googleAppCredentialsPath
+		}
 		var err error
 		client, err = gitkit.New(context.Background(), config)
 		if err != nil {
