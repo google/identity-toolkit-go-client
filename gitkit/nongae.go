@@ -16,12 +16,18 @@
 
 package gitkit
 
-import "golang.org/x/net/context"
+import (
+	"net/http"
 
-func runInGAEProd() bool {
-	return false
+	"golang.org/x/net/context"
+)
+
+// defaultTransport returns the default HTTP transport.
+func defaultTransport(ctx context.Context) http.RoundTripper {
+	return http.DefaultTransport
 }
 
-func NewWithContext(ctx context.Context, client *Client) (*Client, error) {
-	return client, nil
+// apiClient returns the APIClient instance in the Client.
+func (c *Client) apiClient(ctx context.Context) *APIClient {
+	return c.api
 }

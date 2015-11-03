@@ -35,19 +35,12 @@ type Config struct {
 	WidgetModeParamName string `json:"widgetModeParamName,omitempty"`
 	// CookieName is the name of the cookie that stores the ID token.
 	CookieName string `json:"cookieName,omitempty"`
-	// ServiceAccount is the Google OAuth2 service account email address.
-	ServiceAccount string `json:"serviceAccountEmail,omitempty"`
-	// PEMKeyPath is the path of the PEM enconding private key file for the
-	// service account.
-	// When obtaining a key from the Google API console it will be  downloaded
-	// in a PKCS12 encoding, which can be converted to PEM encoding by openssl:
-	//
-	//	$ openssl pkcs12 -in <key.p12> -nocerts -passin pass:notasecret -nodes -out <key.pem>
-	PEMKeyPath string `json:"serviceAccountPrivateKeyFile,omitempty"`
-	// PEMKey is the PEM enconding private key for the service account.
-	// Either PEMKeyPath or PEMKey should be provided if a service account is
-	// required.
-	PEMKey []byte `json:"-"`
+	// GoogleAppCredentialsPath is the path of the service account JSON key file
+	// downloaded from Google cloud console.
+	// Only specify it if you cannot use Google Application Default Credentials.
+	// See https://developers.google.com/identity/protocols/application-default-credentials
+	// for more details about Application Default Credentials.
+	GoogleAppCredentialsPath string `json:"googleAppCredentialsPath",omitempty"`
 }
 
 // LoadConfig loads the configuration from the config file specified by path.
@@ -64,34 +57,19 @@ func LoadConfig(path string) (*Config, error) {
 }
 
 const (
-	defaultWidgetModeParamName = "mode"
-	defaultCookieName          = "gtoken"
+	DefaultWidgetModeParamName = "mode"
+	DefaultCookieName          = "gtoken"
 )
 
-func (conf *Config) normalize(requireServiceAccountInfo bool) error {
+func (conf *Config) normalize() error {
 	if conf.ClientID == "" {
 		return errors.New("missing ClientID in config")
 	}
 	if conf.WidgetModeParamName == "" {
-		conf.WidgetModeParamName = defaultWidgetModeParamName
+		conf.WidgetModeParamName = DefaultWidgetModeParamName
 	}
 	if conf.CookieName == "" {
-		conf.CookieName = defaultCookieName
-	}
-	if len(conf.PEMKey) == 0 && conf.PEMKeyPath != "" {
-		key, err := ioutil.ReadFile(conf.PEMKeyPath)
-		if err != nil {
-			return err
-		}
-		conf.PEMKey = key
-	}
-	if requireServiceAccountInfo {
-		if conf.ServiceAccount == "" {
-			return errors.New("missing ServiceAccount in config")
-		}
-		if len(conf.PEMKey) == 0 {
-			return errors.New("missing PEMKey or PEMKeyPath in config")
-		}
+		conf.CookieName = DefaultCookieName
 	}
 	return nil
 }

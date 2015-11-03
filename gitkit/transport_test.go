@@ -20,9 +20,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"testing"
-	"time"
-
-	"golang.org/x/oauth2"
 )
 
 type roundTripper struct {
@@ -44,13 +41,8 @@ func (r roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return resp, nil
 }
 
-func TestServiceAccountTransport(t *testing.T) {
-	st := &ServiceAccountTransport{
-		Auth: &PEMKeyAuthenticator{
-			token: &oauth2.Token{AccessToken: "access_token", Expiry: time.Now().Add(1 * time.Hour)},
-		},
-		Transport: roundTripper{},
-	}
+func TestRoundTrip(t *testing.T) {
+	st := &transport{roundTripper{}}
 	req, err := http.NewRequest("POST", "http://localhost", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -66,7 +58,6 @@ func TestServiceAccountTransport(t *testing.T) {
 		key, origValue, newValue string
 	}{
 		{"X-Test-Header", "test_header", "test_header"},
-		{"Authorization", "", "Bearer access_token"},
 		{"User-Agent", "", "gitkit-go-client/0.1.1"},
 		{"Content-type", "", "application/json"},
 	}

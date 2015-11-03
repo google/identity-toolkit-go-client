@@ -17,66 +17,21 @@
 package gitkit
 
 import (
-	"errors"
 	"net/http"
-	"sync"
 
-	"google.golang.org/appengine"
 	"google.golang.org/appengine/urlfetch"
 
 	"golang.org/x/net/context"
-	"golang.org/x/oauth2"
 )
 
-func runInGAEProd() bool {
-	return !appengine.IsDevAppServer()
+// defaultTransport returns a urlfetcher HTTP transport in AppEngine.
+func defaultTransport(ctx context.Context) http.RoundTripper {
+	return urlfetch.Client(ctx).Transport
 }
 
-var (
-	gaeAppToken   *oauth2.Token
-	gaeAppTokenMu sync.Mutex
-)
-
-// GAEAppAuthenticator uses Google App Engine App Identity API to authenticate.
-type GAEAppAuthenticator struct {
-	ctx context.Context
-}
-
-// SetContext implements Authenticator interface
-func (a *GAEAppAuthenticator) SetContext(ctx context.Context) {
-	a.ctx = ctx
-}
-
-// AccessToken implements Authenticator interface
-func (a *GAEAppAuthenticator) AccessToken(http.RoundTripper) (string, error) {
-	gaeAppTokenMu.Lock()
-	defer gaeAppTokenMu.Unlock()
-
-	if gaeAppToken == nil || !gaeAppToken.Valid() {
-		token, expiry, err := appengine.AccessToken(a.ctx, identitytoolkitScope)
-		if err != nil {
-			return "", err
-		}
-		gaeAppToken = &oauth2.Token{
-			AccessToken: token,
-			Expiry:      expiry,
-		}
-	}
-	return gaeAppToken.AccessToken, nil
-}
-
-// NewWithContext creates a Client from the global one and associates it with an
-// appengine.Context, which is required by most appengine APIs.
-func NewWithContext(ctx context.Context, client *Client) (*Client, error) {
-	if _, isGAEAuth := client.authenticator.(*GAEAppAuthenticator); isGAEAuth {
-		return nil, errors.New("global client shouldn't have GAEAppAuthenticator")
-	}
-	newClient := *client
-	if newClient.authenticator == nil {
-		newClient.authenticator = &GAEAppAuthenticator{ctx}
-	} else {
-		newClient.authenticator.SetContext(ctx)
-	}
-	newClient.transport = urlfetch.Client(ctx).Transport
-	return &newClient, nil
+// apiClient creates a new APIClient based on the current context.
+func (c *Client) apiClient(ctx context.Context) *APIClient {
+	// newAPIClient should never return error on App Engine.
+	api, _ := newAPIClient(ctx, c.jc)
+	return api
 }
