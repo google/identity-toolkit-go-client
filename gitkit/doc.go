@@ -25,7 +25,7 @@ To use Identity Toolkit Go client:
 	func handleSignIn(w http.ResponseWriter, r *http.Request) {
 		// If there is no valid session, check identity tookit ID token.
 		ts := client.TokenFromRequest(r)
-		token, err := client.ValidateToken(ts)
+		token, err := client.ValidateToken(context.Background(), ts)
 		if err != nil {
 			// Not a valid token. Handle error.
 		}
@@ -43,7 +43,44 @@ To use Identity Toolkit Go client:
 			CookieName:	"gtoken",
 		}
 		var err error
-		client, err = gitkit.New(context.TODO(), config)
+		client, err = gitkit.New(context.Background(), config)
+		if err != nil {
+			// Handle error.
+		}
+
+		// Provide HTTP handler.
+		http.HandleFunc("/signIn", handleSignIn)
+		// Start the server.
+		log.Fatal(http.ListenAndServe(":8080", nil))
+	}
+
+The integration with Google App Engine is similar except for the context
+variable should be created from the request, i.e., appengine.NewContext(r):
+
+	var client *gitkit.Client
+
+	func handleSignIn(w http.ResponseWriter, r *http.Request) {
+		// If there is no valid session, check identity tookit ID token.
+		ts := client.TokenFromRequest(r)
+		token, err := client.ValidateToken(appengine.NewContext(r), ts)
+		if err != nil {
+			// Not a valid token. Handle error.
+		}
+		// Token is validate and it contains the user account information
+		// including user ID, email address, etc.
+		// Issue your own session cookie to finish the sign in.
+	}
+
+	func init() {
+		// Provide configuration. gitkit.LoadConfig() can also be used to load
+		// the configuration from a JSON file.
+		config := &gitkit.Config{
+			ClientID:	"123.apps.googleusercontent.com",
+			WidgetURL:	"http://localhost/gitkit",
+			CookieName:	"gtoken",
+		}
+		var err error
+		client, err = gitkit.New(context.Background(), config)
 		if err != nil {
 			// Handle error.
 		}
@@ -77,5 +114,8 @@ service account associated with the virtual machine instance will be used.
 
 See more about Google Application Default Credentials at
 https://developers.google.com/identity/protocols/application-default-credentials
+
+If Application Default Credentials doesn't work for your use case, you can
+set `GoogleAppCredentialsPath` in the config to the JSON key file path.
 */
 package gitkit

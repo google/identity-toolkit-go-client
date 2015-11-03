@@ -26,3 +26,8 @@ import (
 func defaultTransport(ctx context.Context) http.RoundTripper {
 	return http.DefaultTransport
 }
+
+// apiClient returns the APIClient instance in the Client.
+func (c *Client) apiClient(ctx context.Context) *APIClient {
+	return c.api
+}

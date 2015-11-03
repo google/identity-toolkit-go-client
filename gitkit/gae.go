@@ -28,3 +28,10 @@ import (
 func defaultTransport(ctx context.Context) http.RoundTripper {
 	return urlfetch.Client(ctx).Transport
 }
+
+// apiClient creates a new APIClient based on the current context.
+func (c *Client) apiClient(ctx context.Context) *APIClient {
+	// newAPIClient should never return error on App Engine.
+	api, _ := newAPIClient(ctx, c.jc)
+	return api
+}

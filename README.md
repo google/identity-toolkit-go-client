@@ -47,27 +47,65 @@ func main() {
 }
 ```
 
+The integration with Google App Engine is similar except for the context
+variable should be created from the request, i.e., appengine.NewContext(r):
+```go
+var client *gitkit.Client
+
+func handleSignIn(w http.ResponseWriter, r *http.Request) {
+	// If there is no valid session, check identity tookit ID token.
+	ts := client.TokenFromRequest(r)
+	token, err := client.ValidateToken(appengine.NewContext(r), ts)
+	if err != nil {
+		// Not a valid token. Handle error.
+	}
+	// Token is validate and it contains the user account information
+	// including user ID, email address, etc.
+	// Issue your own session cookie to finish the sign in.
+}
+
+func init() {
+	// Provide configuration. gitkit.LoadConfig() can also be used to load
+	// the configuration from a JSON file.
+	config := &gitkit.Config{
+		ClientID:	"123.apps.googleusercontent.com",
+		WidgetURL:	"http://localhost/gitkit",
+		CookieName:	"gtoken",
+	}
+	var err error
+	client, err = gitkit.New(context.Background(), config)
+	if err != nil {
+		// Handle error.
+	}
+
+	// Provide HTTP handler.
+	http.HandleFunc("/signIn", handleSignIn)
+	// Start the server.
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+```
+
 The client also provides other methods to help manage user accounts, for
 example,
 
 To validate the token and also fetch the account information from the
 identity toolkit service:
 ```go
-user, err := client.UserByToken(token)
+user, err := client.UserByToken(ctx, token)
 ```
 or:
 ```go
-user, err := client.UserByEmail(email)
+user, err := client.UserByEmail(ctx, email)
 ```
 or:
 ```go
-user, err := client.UserByLocalID(localID)
+user, err := client.UserByLocalID(ctx, localID)
 ```
 
 To update, or delete the account information of a user:
 ```go
-err := client.UpdateUser(user)
-err := client.DeleteUser(user)
+err := client.UpdateUser(ctx, user)
+err := client.DeleteUser(ctx, user)
 ```
 
 The Go client uses [Google Application Default Credentials][gadc] to access
@@ -90,6 +128,9 @@ account associated with the application will be used.
 4. If you are running in Google Compute Engine production, the built-in
 service account associated with the virtual machine instance will be used.
 5. If none of these conditions is true, an error will occur.
+
+If Application Default Credentials doesn't work for your use case, you can
+set `GoogleAppCredentialsPath` in the config to the JSON key file path.
 
 [travisimg]: https://api.travis-ci.org/google/identity-toolkit-go-client.svg
 [travis]: https://travis-ci.org/google/identity-toolkit-go-client
