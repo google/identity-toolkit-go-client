@@ -46,6 +46,7 @@ func TestAPIMethod(t *testing.T) {
 		{uploadAccount, "https://www.googleapis.com/identitytoolkit/v3/relyingparty/uploadAccount"},
 		{downloadAccount, "https://www.googleapis.com/identitytoolkit/v3/relyingparty/downloadAccount"},
 		{getOOBCode, "https://www.googleapis.com/identitytoolkit/v3/relyingparty/getOobConfirmationCode"},
+		{getProjectConfig, "https://www.googleapis.com/identitytoolkit/v3/relyingparty/getProjectConfig"},
 	}
 	for i, mt := range methodTests {
 		if mt.m.url() != mt.url {
@@ -446,4 +447,37 @@ func TestGetOOBCode(t *testing.T) {
 			t.Errorf("%s: DownloadAccount() = %v, %v; want %v, nil", gt.name, resp, err, gt.resp)
 		}
 	}
+}
+
+func TestGetProjectConfig(t *testing.T) {
+	getConfigTests := []struct {
+		name string
+		err  bool
+		json string
+		resp *GetProjectConfigResponse
+	}{
+		{
+			"api_error",
+			true,
+			`{"error": {"code": 403, "errors": [{"reason": "accessNotConfigured"}]}}`,
+			nil,
+		},
+		{
+			"success",
+			false,
+			`{"projectId": "project_id", "apiKey": "api_key", "allowPasswordUser": true, "idpConfig": [{"provider": "GOOGLE", "clientId": "client_id"}]}`,
+			&GetProjectConfigResponse{ProjectID: "project_id", APIKey: "api_key", AllowPasswordUser: true, IdpConfigs: []*IdpConfig{{Provider: "GOOGLE", ClientID: "client_id"}}},
+		},
+	}
+	for _, gt := range getConfigTests {
+		c := prepareClient(gt.err, gt.json)
+		resp, err := c.GetProjectConfig()
+		if gt.err && err == nil {
+			t.Errorf("%s: GetProjectConfig() = %v, nil; want nil, err", gt.name, resp)
+		}
+		if !gt.err && (err != nil || resp == nil || len(resp.IdpConfigs) != len(gt.resp.IdpConfigs)) {
+			t.Errorf("%s: GetProjectConfig() = %v, %v; want %v, nil", gt.name, resp, err, gt.resp)
+		}
+	}
+
 }

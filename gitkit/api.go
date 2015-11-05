@@ -105,6 +105,13 @@ type User struct {
 	Password string `json:"-"`
 }
 
+// IdpConfig holds the IDP configuration.
+type IdpConfig struct {
+	Provider string `json:"provider,omitempty"`
+	Enabled  bool   `json:"enabled,omitempty"`
+	ClientID string `json:"clientId,omitempty"`
+}
+
 // Identitytoolkit API endpoint URL common parts.
 var (
 	APIBaseURI = "https://www.googleapis.com/identitytoolkit"
@@ -115,12 +122,13 @@ var (
 type apiMethod string
 
 const (
-	getAccountInfo  apiMethod = "getAccountInfo"
-	setAccountInfo  apiMethod = "setAccountInfo"
-	deleteAccount   apiMethod = "deleteAccount"
-	uploadAccount   apiMethod = "uploadAccount"
-	downloadAccount apiMethod = "downloadAccount"
-	getOOBCode      apiMethod = "getOobConfirmationCode"
+	getAccountInfo   apiMethod = "getAccountInfo"
+	setAccountInfo   apiMethod = "setAccountInfo"
+	deleteAccount    apiMethod = "deleteAccount"
+	uploadAccount    apiMethod = "uploadAccount"
+	downloadAccount  apiMethod = "downloadAccount"
+	getOOBCode       apiMethod = "getOobConfirmationCode"
+	getProjectConfig apiMethod = "getProjectConfig"
 )
 
 // URL returns the full URL of the API method.
@@ -137,8 +145,20 @@ type APIClient struct {
 	http.Client
 }
 
-func (c *APIClient) post(m apiMethod, body []byte) ([]byte, error) {
-	req, _ := http.NewRequest("POST", m.url(), bytes.NewReader(body))
+type httpMethod string
+
+const (
+	GET  httpMethod = "GET"
+	POST httpMethod = "POST"
+)
+
+func (c *APIClient) do(httpMethod httpMethod, m apiMethod, body []byte) ([]byte, error) {
+	var req *http.Request
+	if httpMethod == POST {
+		req, _ = http.NewRequest(string(httpMethod), m.url(), bytes.NewReader(body))
+	} else {
+		req, _ = http.NewRequest(string(httpMethod), m.url(), nil)
+	}
 	googleapi.SetOpaque(req.URL)
 	resp, err := c.Do(req)
 	if err != nil {
@@ -151,16 +171,20 @@ func (c *APIClient) post(m apiMethod, body []byte) ([]byte, error) {
 	return ioutil.ReadAll(resp.Body)
 }
 
-func (c *APIClient) request(m apiMethod, req, resp interface{}) error {
+func (c *APIClient) request(httpMethod httpMethod, m apiMethod, req, resp interface{}) error {
 	t := reflect.TypeOf(resp)
 	if t.Kind() != reflect.Ptr {
 		log.Fatal("Resp must be a pointer.")
 	}
-	body, err := json.Marshal(req)
+	var body []byte
+	var err error
+	if req != nil {
+		body, err = json.Marshal(req)
+	}
 	if err != nil {
 		return err
 	}
-	body, err = c.post(m, body)
+	body, err = c.do(httpMethod, m, body)
 	if err != nil {
 		return err
 	}
@@ -191,7 +215,7 @@ func (c *APIClient) GetAccountInfo(req *GetAccountInfoRequest) (*GetAccountInfoR
 	}
 
 	resp := &GetAccountInfoResponse{}
-	if err := c.request(getAccountInfo, req, resp); err != nil {
+	if err := c.request(POST, getAccountInfo, req, resp); err != nil {
 		return nil, err
 	}
 	return resp, nil
@@ -220,7 +244,7 @@ func (c *APIClient) SetAccountInfo(req *SetAccountInfoRequest) (*SetAccountInfoR
 	}
 
 	resp := &SetAccountInfoResponse{}
-	if err := c.request(setAccountInfo, req, resp); err != nil {
+	if err := c.request(POST, setAccountInfo, req, resp); err != nil {
 		return nil, err
 	}
 	return resp, nil
@@ -243,7 +267,7 @@ func (c *APIClient) DeleteAccount(req *DeleteAccountRequest) (*DeleteAccountResp
 	}
 
 	resp := &DeleteAccountResponse{}
-	if err := c.request(deleteAccount, req, resp); err != nil {
+	if err := c.request(POST, deleteAccount, req, resp); err != nil {
 		return nil, err
 	}
 	return resp, nil
@@ -294,7 +318,7 @@ func (c *APIClient) UploadAccount(req *UploadAccountRequest) (*UploadAccountResp
 	}
 
 	resp := &UploadAccountResponse{}
-	if err := c.request(uploadAccount, req, resp); err != nil {
+	if err := c.request(POST, uploadAccount, req, resp); err != nil {
 		return nil, err
 	}
 	return resp, nil
@@ -319,7 +343,7 @@ type DownloadAccountResponse struct {
 // DownloadAccount donwloads accounts from identitytoolkit service.
 func (c *APIClient) DownloadAccount(req *DownloadAccountRequest) (*DownloadAccountResponse, error) {
 	resp := &DownloadAccountResponse{}
-	if err := c.request(downloadAccount, req, resp); err != nil {
+	if err := c.request(POST, downloadAccount, req, resp); err != nil {
 		return nil, err
 	}
 	return resp, nil
@@ -393,7 +417,25 @@ func (c *APIClient) GetOOBCode(req *GetOOBCodeRequest) (*GetOOBCodeResponse, err
 	}
 
 	resp := &GetOOBCodeResponse{}
-	if err := c.request(getOOBCode, req, resp); err != nil {
+	if err := c.request(POST, getOOBCode, req, resp); err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+// GetProjectConfigResponse contains the project ID, API key, whether password login is
+// enabled and a list of IDP configs.
+type GetProjectConfigResponse struct {
+	ProjectID         string       `json:"projectId,omitempty"`
+	APIKey            string       `json:"apiKey,omitempty"`
+	AllowPasswordUser bool         `json:"allowPasswordUser,omitempty"`
+	IdpConfigs        []*IdpConfig `json:"idpConfig,omitempty"`
+}
+
+// GetProjectConfig retrieves the configuration information for the project.
+func (c *APIClient) GetProjectConfig() (*GetProjectConfigResponse, error) {
+	resp := &GetProjectConfigResponse{}
+	if err := c.request(GET, getProjectConfig, nil, resp); err != nil {
 		return nil, err
 	}
 	return resp, nil
