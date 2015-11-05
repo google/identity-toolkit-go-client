@@ -20,6 +20,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2/google"
@@ -45,9 +46,6 @@ type Client struct {
 // New creates a Client from the configuration.
 func New(ctx context.Context, config *Config) (*Client, error) {
 	conf := *config
-	if err := conf.normalize(); err != nil {
-		return nil, err
-	}
 	certs := &Certificates{URL: publicCertsURL}
 	var widgetURL *url.URL
 	if conf.WidgetURL != "" {
@@ -70,6 +68,12 @@ func New(ctx context.Context, config *Config) (*Client, error) {
 	}
 	api, err := newAPIClient(ctx, jc)
 	if err != nil {
+		return nil, err
+	}
+	if err := retrieveProjectConfigIfNeeded(api, &conf); err != nil {
+		return nil, fmt.Errorf("unable to retrieve API key and client ID: %#v", err)
+	}
+	if err := conf.normalize(); err != nil {
 		return nil, err
 	}
 	return &Client{
@@ -445,4 +449,54 @@ func extractRemoteIP(req *http.Request) string {
 		return req.RemoteAddr
 	}
 	return host
+}
+
+func retrieveProjectConfigIfNeeded(apiClient *APIClient, conf *Config) error {
+	if conf.BrowserAPIKey != "" && conf.ClientID != "" && conf.WidgetURL != "" && len(conf.SignInOptions) > 0 {
+		return nil
+	}
+
+	resp, err := apiClient.GetProjectConfig()
+	if err != nil {
+		return err
+	}
+	if conf.BrowserAPIKey == "" {
+		conf.BrowserAPIKey = resp.APIKey
+	}
+	var opts []string
+	var googleClientID string
+	for _, element := range resp.IdpConfigs {
+		if element.Provider == "GOOGLE" {
+			googleClientID = element.ClientID
+		}
+		if element.Enabled {
+			opts = append(opts, strings.ToLower(element.Provider))
+		}
+	}
+	if googleClientID == "" {
+		return fmt.Errorf("should at least have Google Idp Config")
+	}
+	if conf.ClientID == "" {
+		conf.ClientID = googleClientID
+	}
+	if resp.AllowPasswordUser {
+		opts = append(opts, "password")
+	}
+	if len(conf.SignInOptions) == 0 {
+		if len(opts) == 0 {
+			return fmt.Errorf("should have at least one sign in option")
+		}
+		conf.SignInOptions = opts
+	}
+	return nil
+}
+
+// BrowserAPIKey returns browser API key from the config.
+func (c *Client) BrowserAPIKey() string {
+	return c.config.BrowserAPIKey
+}
+
+// SignInOptions returns sign in options from the config.
+func (c *Client) SignInOptions() []string {
+	return c.config.SignInOptions
 }
