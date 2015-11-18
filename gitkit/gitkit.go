@@ -15,6 +15,7 @@
 package gitkit
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -41,6 +42,16 @@ type Client struct {
 	certs     *Certificates
 	api       *APIClient // Don't use this field directly. Use apiClient() instead.
 	jc        *jwt.Config
+}
+
+// ProjectConfig contains the Gitkit configurations of the project.
+type ProjectConfig struct {
+	// BrowserAPIKey is the API key used to call Google API in web browser.
+	BrowserAPIKey string `json:"browserApiKey,omitempty"`
+	// ClientID is the Google OAuth2 client ID for the server.
+	ClientID string `json:"clientId,omitempty"`
+	// SignInOptions are the sign in methods provided to users for sign in.
+	SignInOptions []string `json:"signInOptions,omitempty"`
 }
 
 // New creates a Client from the configuration.
@@ -70,12 +81,7 @@ func New(ctx context.Context, config *Config) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := retrieveProjectConfigIfNeeded(api, &conf); err != nil {
-		return nil, fmt.Errorf("unable to retrieve API key and client ID: %#v", err)
-	}
-	if err := conf.normalize(); err != nil {
-		return nil, err
-	}
+	conf.normalize()
 	return &Client{
 		config:    &conf,
 		widgetURL: widgetURL,
@@ -117,6 +123,9 @@ func (c *Client) TokenFromRequest(req *http.Request) string {
 // Beside verifying the token is a valid JWT, it also validates that the token
 // is not expired and is issued to the client.
 func (c *Client) ValidateToken(ctx context.Context, token string) (*Token, error) {
+	if c.config.ClientID == "" {
+		return nil, errors.New("missing ClientID in config")
+	}
 	if err := c.certs.LoadIfNecessary(defaultTransport(ctx)); err != nil {
 		return nil, err
 	}
@@ -451,52 +460,26 @@ func extractRemoteIP(req *http.Request) string {
 	return host
 }
 
-func retrieveProjectConfigIfNeeded(apiClient *APIClient, conf *Config) error {
-	if conf.BrowserAPIKey != "" && conf.ClientID != "" && conf.WidgetURL != "" && len(conf.SignInOptions) > 0 {
-		return nil
-	}
-
-	resp, err := apiClient.GetProjectConfig()
+// GetProjectConfig gets the Gitkit configuration of this project.
+func (c *Client) GetProjectConfig(ctx context.Context) (*ProjectConfig, error) {
+	resp, err := c.apiClient(ctx).GetProjectConfig()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if conf.BrowserAPIKey == "" {
-		conf.BrowserAPIKey = resp.APIKey
-	}
+	pc := &ProjectConfig{}
+	pc.BrowserAPIKey = resp.APIKey
 	var opts []string
-	var googleClientID string
 	for _, element := range resp.IdpConfigs {
 		if element.Provider == "GOOGLE" {
-			googleClientID = element.ClientID
+			pc.ClientID = element.ClientID
 		}
 		if element.Enabled {
 			opts = append(opts, strings.ToLower(element.Provider))
 		}
 	}
-	if googleClientID == "" {
-		return fmt.Errorf("should at least have Google Idp Config")
-	}
-	if conf.ClientID == "" {
-		conf.ClientID = googleClientID
-	}
 	if resp.AllowPasswordUser {
 		opts = append(opts, "password")
 	}
-	if len(conf.SignInOptions) == 0 {
-		if len(opts) == 0 {
-			return fmt.Errorf("should have at least one sign in option")
-		}
-		conf.SignInOptions = opts
-	}
-	return nil
-}
-
-// BrowserAPIKey returns browser API key from the config.
-func (c *Client) BrowserAPIKey() string {
-	return c.config.BrowserAPIKey
-}
-
-// SignInOptions returns sign in options from the config.
-func (c *Client) SignInOptions() []string {
-	return c.config.SignInOptions
+	pc.SignInOptions = opts
+	return pc, nil
 }
