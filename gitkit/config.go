@@ -16,14 +16,11 @@ package gitkit
 
 import (
 	"encoding/json"
-	"errors"
 	"io/ioutil"
 )
 
 // Config contains the configurations for creating a Client.
 type Config struct {
-	// BrowserAPIKey is the API key used to call Google API in web browser.
-	BrowserAPIKey string `json:"browserApiKey,omitempty"`
 	// ClientID is the Google OAuth2 client ID for the server.
 	ClientID string `json:"clientId,omitempty"`
 	// WidgetURL is the identitytoolkit javascript widget URL.
@@ -37,8 +34,6 @@ type Config struct {
 	WidgetModeParamName string `json:"widgetModeParamName,omitempty"`
 	// CookieName is the name of the cookie that stores the ID token.
 	CookieName string `json:"cookieName,omitempty"`
-	// SignInOptions are the sign in methods provided to users for sign in.
-	SignInOptions []string `json:"signInOptions,omitempty"`
 	// GoogleAppCredentialsPath is the path of the service account JSON key file
 	// downloaded from Google cloud console.
 	// Only specify it if you cannot use Google Application Default Credentials.
@@ -65,15 +60,11 @@ const (
 	DefaultCookieName          = "gtoken"
 )
 
-func (conf *Config) normalize() error {
-	if conf.ClientID == "" {
-		return errors.New("missing ClientID in config")
-	}
+func (conf *Config) normalize() {
 	if conf.WidgetModeParamName == "" {
 		conf.WidgetModeParamName = DefaultWidgetModeParamName
 	}
 	if conf.CookieName == "" {
 		conf.CookieName = DefaultCookieName
 	}
-	return nil
 }

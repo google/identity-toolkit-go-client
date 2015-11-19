@@ -9,21 +9,17 @@ import (
 
 const (
 	config = `{
-		"browserApiKey": "browser_key",
 		"clientId": "client_id",
 		"widgetUrl": "widget_url",
 		"widgetModeParamName": "widget_mode_param_name",
 		"cookieName": "cookie_name",
-		"signInOptions": ["option1", "option2"],
 		"googleAppCredentialsPath": "/some/path"
 	}`
 	configWithUnrecognized = `{
-		"browserApiKey": "browser_key",
 		"clientId": "client_id",
 		"widgetUrl": "widget_url",
 		"widgetModeParamName": "widget_mode_param_name",
 		"cookieName": "cookie_name",
-		"signInOptions": ["option1", "option2"],
 		"googleAppCredentialsPath": "/some/path",
 		"unrecognized": "blabla"
 	}`
@@ -52,7 +48,7 @@ func TestLoadConfig(t *testing.T) {
 	tests := []struct {
 		config string
 	}{{config}, {configWithUnrecognized}}
-	conf := Config{"browser_key", "client_id", "widget_url", "widget_mode_param_name", "cookie_name", []string{"option1", "option2"}, "/some/path"}
+	conf := Config{"client_id", "widget_url", "widget_mode_param_name", "cookie_name", "/some/path"}
 	for i, tt := range tests {
 		f, err := createConfigFile(tt.config)
 		if err != nil {
@@ -74,35 +70,32 @@ func TestConfig_normalize(t *testing.T) {
 		normalized *Config
 	}{
 		{
-			&Config{"", "", "/", "mode", "gtoken", nil, ""},
-			nil,
+			&Config{"", "/", "mode", "gtoken", ""},
+			&Config{"", "/", "mode", "gtoken", ""},
 		},
 		{
-			&Config{"", "client_id", "/", "", "", nil, ""},
-			&Config{"", "client_id", "/", "mode", "gtoken", nil, ""},
+			&Config{"client_id", "/", "", "", ""},
+			&Config{"client_id", "/", "mode", "gtoken", ""},
 		},
 		{
-			&Config{"", "client_id", "/", "mode", "gtoken", nil, "/some/path"},
-			&Config{"", "client_id", "/", "mode", "gtoken", nil, "/some/path"},
+			&Config{"client_id", "/", "mode", "gtoken", "/some/path"},
+			&Config{"client_id", "/", "mode", "gtoken", "/some/path"},
 		},
 		{
-			&Config{"", "client_id", "/", "", "gitkittoken", nil, ""},
-			&Config{"", "client_id", "/", "mode", "gitkittoken", nil, ""},
+			&Config{"client_id", "/", "", "gitkittoken", ""},
+			&Config{"client_id", "/", "mode", "gitkittoken", ""},
 		},
 		{
-			&Config{"", "client_id", "/", "gitkitmode", "", nil, ""},
-			&Config{"", "client_id", "/", "gitkitmode", "gtoken", nil, ""},
+			&Config{"client_id", "/", "gitkitmode", "", ""},
+			&Config{"client_id", "/", "gitkitmode", "gtoken", ""},
 		},
 		{
-			&Config{"", "client_id", "/", "gitkitmode", "gitkittoken", nil, ""},
-			&Config{"", "client_id", "/", "gitkitmode", "gitkittoken", nil, ""},
+			&Config{"client_id", "/", "gitkitmode", "gitkittoken", ""},
+			&Config{"client_id", "/", "gitkitmode", "gitkittoken", ""},
 		},
 	}
 	for i, tt := range tests {
-		err := tt.orig.normalize()
-		if tt.normalized == nil && err == nil {
-			t.Errorf("[%d]: expected normalize() to return error, but got nil", i)
-		}
+		tt.orig.normalize()
 		if tt.normalized != nil && !reflect.DeepEqual(*tt.normalized, *tt.orig) {
 			t.Errorf("[%d]: expected normalize()=%v, but got %v", i, *tt.normalized, *tt.orig)
 		}
