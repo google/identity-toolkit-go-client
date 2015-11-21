@@ -9,14 +9,12 @@ import (
 
 const (
 	config = `{
-		"clientId": "client_id",
 		"widgetUrl": "widget_url",
 		"widgetModeParamName": "widget_mode_param_name",
 		"cookieName": "cookie_name",
 		"googleAppCredentialsPath": "/some/path"
 	}`
 	configWithUnrecognized = `{
-		"clientId": "client_id",
 		"widgetUrl": "widget_url",
 		"widgetModeParamName": "widget_mode_param_name",
 		"cookieName": "cookie_name",
@@ -48,7 +46,7 @@ func TestLoadConfig(t *testing.T) {
 	tests := []struct {
 		config string
 	}{{config}, {configWithUnrecognized}}
-	conf := Config{"client_id", "widget_url", "widget_mode_param_name", "cookie_name", "/some/path"}
+	conf := Config{"widget_url", "widget_mode_param_name", "cookie_name", "/some/path"}
 	for i, tt := range tests {
 		f, err := createConfigFile(tt.config)
 		if err != nil {
@@ -70,28 +68,28 @@ func TestConfig_normalize(t *testing.T) {
 		normalized *Config
 	}{
 		{
-			&Config{"", "/", "mode", "gtoken", ""},
-			&Config{"", "/", "mode", "gtoken", ""},
+			&Config{"/", "mode", "gtoken", ""},
+			&Config{"/", "mode", "gtoken", ""},
 		},
 		{
-			&Config{"client_id", "/", "", "", ""},
-			&Config{"client_id", "/", "mode", "gtoken", ""},
+			&Config{"/", "", "", ""},
+			&Config{"/", "mode", "gtoken", ""},
 		},
 		{
-			&Config{"client_id", "/", "mode", "gtoken", "/some/path"},
-			&Config{"client_id", "/", "mode", "gtoken", "/some/path"},
+			&Config{"/", "mode", "gtoken", "/some/path"},
+			&Config{"/", "mode", "gtoken", "/some/path"},
 		},
 		{
-			&Config{"client_id", "/", "", "gitkittoken", ""},
-			&Config{"client_id", "/", "mode", "gitkittoken", ""},
+			&Config{"/", "", "gitkittoken", ""},
+			&Config{"/", "mode", "gitkittoken", ""},
 		},
 		{
-			&Config{"client_id", "/", "gitkitmode", "", ""},
-			&Config{"client_id", "/", "gitkitmode", "gtoken", ""},
+			&Config{"/", "gitkitmode", "", ""},
+			&Config{"/", "gitkitmode", "gtoken", ""},
 		},
 		{
-			&Config{"client_id", "/", "gitkitmode", "gitkittoken", ""},
-			&Config{"client_id", "/", "gitkitmode", "gitkittoken", ""},
+			&Config{"/", "gitkitmode", "gitkittoken", ""},
+			&Config{"/", "gitkitmode", "gitkittoken", ""},
 		},
 	}
 	for i, tt := range tests {

@@ -21,8 +21,6 @@ import (
 
 // Config contains the configurations for creating a Client.
 type Config struct {
-	// ClientID is the Google OAuth2 client ID for the server.
-	ClientID string `json:"clientId,omitempty"`
 	// WidgetURL is the identitytoolkit javascript widget URL.
 	// It is used to generate the reset password or change email URL and
 	// could be an absolute URL, an absolute path or a relative path.

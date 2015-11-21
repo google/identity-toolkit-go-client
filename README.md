@@ -12,12 +12,14 @@ See more at https://developers.google.com/identity-toolkit
 
 To use Identity Toolkit Go client:
 ```go
+// ClientID is the OAuth2 web client ID for your server.
+const clientID string = "123.apps.googleusercontent.com"
 var client *gitkit.Client
 
 func handleSignIn(w http.ResponseWriter, r *http.Request) {
 	// If there is no valid session, check identity tookit ID token.
 	ts := client.TokenFromRequest(r)
-	token, err := client.ValidateToken(context.Background(), ts)
+	token, err := client.ValidateToken(context.Background(), ts, clientID)
 	if err != nil {
 		// Not a valid token. Handle error.
 	}
@@ -30,7 +32,6 @@ func main() {
 	// Provide configuration. gitkit.LoadConfig() can also be used to load
 	// the configuration from a JSON file.
 	config := &gitkit.Config{
-		ClientID:   "123.apps.googleusercontent.com",
 		WidgetURL:  "http://localhost/gitkit",
 		CookieName: "gtoken",
 	}
@@ -50,12 +51,14 @@ func main() {
 The integration with Google App Engine is similar except for the context
 variable should be created from the request, i.e., `appengine.NewContext(r)`:
 ```go
+// ClientID is the OAuth2 web client ID for your server.
+const clientID string = "123.apps.googleusercontent.com"
 var client *gitkit.Client
 
 func handleSignIn(w http.ResponseWriter, r *http.Request) {
 	// If there is no valid session, check identity tookit ID token.
 	ts := client.TokenFromRequest(r)
-	token, err := client.ValidateToken(appengine.NewContext(r), ts)
+	token, err := client.ValidateToken(appengine.NewContext(r), ts, clientID)
 	if err != nil {
 		// Not a valid token. Handle error.
 	}
@@ -68,7 +71,6 @@ func init() {
 	// Provide configuration. gitkit.LoadConfig() can also be used to load
 	// the configuration from a JSON file.
 	config := &gitkit.Config{
-		ClientID:	"123.apps.googleusercontent.com",
 		WidgetURL:	"http://localhost/gitkit",
 		CookieName:	"gtoken",
 	}
@@ -95,7 +97,7 @@ example,
 To validate the token and also fetch the account information from the
 identity toolkit service:
 ```go
-user, err := client.UserByToken(ctx, token)
+user, err := client.UserByToken(ctx, token, clientID)
 ```
 or:
 ```go
