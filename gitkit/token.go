@@ -79,7 +79,7 @@ var (
 // 2. The value of "aud" field is the same as the audience;
 // 3. The token is not expired according to the "exp" field;
 // 4. The signature can be verified from one of the certs;
-func VerifyToken(token string, audience string, issuers []string, certs *Certificates) (*Token, error) {
+func VerifyToken(token string, audiences []string, issuers []string, certs *Certificates) (*Token, error) {
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
 		return nil, ErrMalformed
@@ -107,7 +107,7 @@ func VerifyToken(token string, audience string, issuers []string, certs *Certifi
 	if issuers != nil && !inArray(issuers, claims.Iss) {
 		return nil, ErrInvalidIssuer
 	}
-	if audience != claims.Aud {
+	if audiences != nil && !inArray(audiences, claims.Aud) {
 		return nil, ErrInvalidAudience
 	}
 	exp := time.Unix(claims.Exp, 0)
