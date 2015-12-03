@@ -70,6 +70,7 @@ var (
 	ErrInvalidSignature = errors.New("invalid signature")
 	ErrKeyNotFound      = errors.New("key not found")
 	ErrExpired          = errors.New("token expired")
+	ErrMissingAudience  = errors.New("missing audiences for token validation")
 )
 
 // VerifyToken verifies the JWT is valid and signed by identitytoolkit service
@@ -80,6 +81,9 @@ var (
 // 3. The token is not expired according to the "exp" field;
 // 4. The signature can be verified from one of the certs;
 func VerifyToken(token string, audiences []string, issuers []string, certs *Certificates) (*Token, error) {
+	if len(audiences) == 0 {
+		return nil, ErrMissingAudience
+	}
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
 		return nil, ErrMalformed

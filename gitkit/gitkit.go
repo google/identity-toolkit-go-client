@@ -123,7 +123,7 @@ func (c *Client) TokenFromRequest(req *http.Request) string {
 // Beside verifying the token is a valid JWT, it also validates that the token
 // is not expired and is issued to the client with the given audiences.
 func (c *Client) ValidateToken(ctx context.Context, token string, audiences []string) (*Token, error) {
-	if audiences == nil || len(audiences) == 0 {
+	if len(audiences) == 0 {
 		return nil, errors.New("missing audiences for token validation")
 	}
 	if err := c.certs.LoadIfNecessary(defaultTransport(ctx)); err != nil {
