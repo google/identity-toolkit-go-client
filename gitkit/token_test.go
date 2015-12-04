@@ -208,7 +208,7 @@ func TestVerifyToken(t *testing.T) {
 		},
 	}
 	for i, tt := range tokenTests {
-		token, err := VerifyToken(tt.s, audience, []string{issuer}, certs)
+		token, err := VerifyToken(tt.s, []string{audience}, []string{issuer}, certs)
 		if tt.err != err {
 			t.Errorf("[%d]%s: expected error=%v, but got %v", i, tt.name, tt.err, err)
 		}
