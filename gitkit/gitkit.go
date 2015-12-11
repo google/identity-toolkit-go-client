@@ -15,7 +15,6 @@
 package gitkit
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
