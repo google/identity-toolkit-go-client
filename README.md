@@ -19,7 +19,7 @@ var client *gitkit.Client
 func handleSignIn(w http.ResponseWriter, r *http.Request) {
 	// If there is no valid session, check identity tookit ID token.
 	ts := client.TokenFromRequest(r)
-	token, err := client.ValidateToken(context.Background(), ts, clientID)
+	token, err := client.ValidateToken(context.Background(), ts, []string{clientID})
 	if err != nil {
 		// Not a valid token. Handle error.
 	}
@@ -58,7 +58,7 @@ var client *gitkit.Client
 func handleSignIn(w http.ResponseWriter, r *http.Request) {
 	// If there is no valid session, check identity tookit ID token.
 	ts := client.TokenFromRequest(r)
-	token, err := client.ValidateToken(appengine.NewContext(r), ts, clientID)
+	token, err := client.ValidateToken(appengine.NewContext(r), ts, []string{clientID})
 	if err != nil {
 		// Not a valid token. Handle error.
 	}
@@ -97,7 +97,7 @@ example,
 To validate the token and also fetch the account information from the
 identity toolkit service:
 ```go
-user, err := client.UserByToken(ctx, token, clientID)
+user, err := client.UserByToken(ctx, token, []string{clientID})
 ```
 or:
 ```go

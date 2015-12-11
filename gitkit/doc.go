@@ -25,7 +25,7 @@ To use Identity Toolkit Go client:
 	func handleSignIn(w http.ResponseWriter, r *http.Request) {
 		// If there is no valid session, check identity tookit ID token.
 		ts := client.TokenFromRequest(r)
-		token, err := client.ValidateToken(context.Background(), ts)
+		token, err := client.ValidateToken(context.Background(), ts, []string{clientID})
 		if err != nil {
 			// Not a valid token. Handle error.
 		}
@@ -62,7 +62,7 @@ variable should be created from the request, i.e., appengine.NewContext(r):
 	func handleSignIn(w http.ResponseWriter, r *http.Request) {
 		// If there is no valid session, check identity tookit ID token.
 		ts := client.TokenFromRequest(r)
-		token, err := client.ValidateToken(appengine.NewContext(r), ts)
+		token, err := client.ValidateToken(appengine.NewContext(r), ts, []string{clientID})
 		if err != nil {
 			// Not a valid token. Handle error.
 		}

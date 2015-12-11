@@ -121,15 +121,12 @@ func (c *Client) TokenFromRequest(req *http.Request) string {
 // ValidateToken validates the ID token and returns a Token.
 //
 // Beside verifying the token is a valid JWT, it also validates that the token
-// is not expired and is issued to the client with the given audience.
-func (c *Client) ValidateToken(ctx context.Context, token string, audience string) (*Token, error) {
-	if audience == "" {
-		return nil, errors.New("missing audience for token validation")
-	}
+// is not expired and is issued to the client with the given audiences.
+func (c *Client) ValidateToken(ctx context.Context, token string, audiences []string) (*Token, error) {
 	if err := c.certs.LoadIfNecessary(defaultTransport(ctx)); err != nil {
 		return nil, err
 	}
-	t, err := VerifyToken(token, audience, nil, c.certs)
+	t, err := VerifyToken(token, audiences, nil, c.certs)
 	if err != nil {
 		return nil, err
 	}
@@ -138,8 +135,8 @@ func (c *Client) ValidateToken(ctx context.Context, token string, audience strin
 
 // UserByToken retrieves the account information of the user specified by the ID
 // token.
-func (c *Client) UserByToken(ctx context.Context, token string, audience string) (*User, error) {
-	t, err := c.ValidateToken(ctx, token, audience)
+func (c *Client) UserByToken(ctx context.Context, token string, audiences []string) (*User, error) {
+	t, err := c.ValidateToken(ctx, token, audiences)
 	if err != nil {
 		return nil, err
 	}
