@@ -111,7 +111,7 @@ func VerifyToken(token string, audiences []string, issuers []string, certs *Cert
 	if issuers != nil && !inArray(issuers, claims.Iss) {
 		return nil, ErrInvalidIssuer
 	}
-	if audiences != nil && !inArray(audiences, claims.Aud) {
+	if !inArray(audiences, claims.Aud) {
 		return nil, ErrInvalidAudience
 	}
 	exp := time.Unix(claims.Exp, 0)
