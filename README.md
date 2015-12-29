@@ -62,7 +62,7 @@ func handleSignIn(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// Not a valid token. Handle error.
 	}
-	// Token is validate and it contains the user account information
+	// Token is valid and it contains the user account information
 	// including user ID, email address, etc.
 	// Issue your own session cookie to finish the sign in.
 }
