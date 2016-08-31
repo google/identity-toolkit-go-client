@@ -159,7 +159,6 @@ func (c *APIClient) do(httpMethod httpMethod, m apiMethod, body []byte) ([]byte,
 	} else {
 		req, _ = http.NewRequest(string(httpMethod), m.url(), nil)
 	}
-	googleapi.SetOpaque(req.URL)
 	resp, err := c.Do(req)
 	if err != nil {
 		return nil, err
